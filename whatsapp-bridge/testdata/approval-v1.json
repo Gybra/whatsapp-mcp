@@ -1,0 +1,18 @@
+{
+  "description": "whatsapp-mcp approval v1 vector. RFC 8032 test-1 key; fictional recipient. Never a live key.",
+  "now": 1800000000,
+  "public_key_b64": "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=",
+  "approver_id": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+  "input": {
+    "kind": "file",
+    "recipient": "12025550123",
+    "message": "Ciao Davide — test \u0026 \u003cok\u003e ✓",
+    "media_id": "report.pdf"
+  },
+  "media_b64": "Zml4dHVyZSBhdHRhY2htZW50Cg==",
+  "draft_id": "000102030405060708090a0b0c0d0e0f",
+  "payload_b64": "eyJ2ZXJzaW9uIjoxLCJkcmFmdF9pZCI6IjAwMDEwMjAzMDQwNTA2MDcwODA5MGEwYjBjMGQwZTBmIiwicmVjaXBpZW50X2ppZCI6IjEyMDI1NTUwMTIzQHMud2hhdHNhcHAubmV0IiwibWVzc2FnZSI6IkNpYW8gRGF2aWRlIOKAlCB0ZXN0IFx1MDAyNiBcdTAwM2Nva1x1MDAzZSDinJMiLCJraW5kIjoiZmlsZSIsImF0dGFjaG1lbnQiOnsiaWQiOiJyZXBvcnQucGRmIiwibmFtZSI6InJlcG9ydC5wZGYiLCJtaW1lIjoiYXBwbGljYXRpb24vcGRmIiwic2l6ZSI6MTksInNoYTI1NiI6ImZhN2I1N2RkZWVhMDllMzQ3MjA5Y2NhNGM1MWViYjc3YjllY2E5NzExN2UxZDRmZWEzMTI2ODAyZGVlN2NjMzAifSwiZXhwaXJlc19hdCI6MTgwMDAwMDEyMH0=",
+  "challenge_b64": "d2hhdHNhcHAtbWNwL2FwcHJvdmFsL3YxABAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vaFVbGTfMq2ORleKQnqpmRxCLlsWVJ3gjrnHjgg7EcQAh/jHfoVSiYWJr+FQEb9InG3vtS2q+RapYh370f5chuQ==",
+  "expires_at": 1800000120,
+  "signature_b64": "36qoksrYftXizb0umqSuI86/oOA15hmBmylVAmr24TD/z2JF2TCJYyJQkhmVj6HPIoiy6xQx5IBBhAIolNkfDA=="
+}

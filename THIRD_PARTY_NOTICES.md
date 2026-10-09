@@ -43,6 +43,7 @@ Modules compiled into the bridge (from `go list -deps`, with each license identi
 | modernc.org/mathutil | v1.7.1 | BSD-3-Clause |
 | modernc.org/memory | v1.12.1 | BSD-3-Clause |
 | modernc.org/sqlite | v1.60.1 | BSD-3-Clause (contains a transpiled copy of SQLite, which is in the public domain) |
+| rsc.io/qr | v0.2.0 | BSD-3-Clause |
 
 The Go standard library and runtime are licensed under the BSD-3-Clause license.
 

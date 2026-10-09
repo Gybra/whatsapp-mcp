@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,23 +18,20 @@ import (
 
 type fakeConsole struct {
 	interactive bool
-	pasted      string
-	confirm     bool
+	answers     []bool // answers to successive Confirm calls; missing answers are "no"
 	prompts     []string
 }
 
 func (c *fakeConsole) IsInteractive() bool { return c.interactive }
 
-func (c *fakeConsole) ReadPublicKey() (string, error) { return c.pasted, nil }
-
-func (c *fakeConsole) ConfirmFingerprint(fingerprint string) (bool, error) {
-	c.prompts = append(c.prompts, fingerprint)
-	return c.confirm, nil
-}
-
-func (c *fakeConsole) ConfirmImport(description string) (bool, error) {
-	c.prompts = append(c.prompts, description)
-	return c.confirm, nil
+func (c *fakeConsole) Confirm(question string) (bool, error) {
+	c.prompts = append(c.prompts, question)
+	if len(c.answers) == 0 {
+		return false, nil
+	}
+	answer := c.answers[0]
+	c.answers = c.answers[1:]
+	return answer, nil
 }
 
 func privateDataDir(t *testing.T) string {
@@ -173,73 +169,6 @@ type iotestErrReader struct{}
 
 func (iotestErrReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
-func TestPairApprover(t *testing.T) {
-	pub := newPublicKey(t)
-
-	dir := privateDataDir(t)
-	console := &fakeConsole{interactive: true, confirm: true}
-	if err := PairApprover(dir, pub, console); err != nil {
-		t.Fatalf("PairApprover: %v", err)
-	}
-	if len(console.prompts) != 1 || console.prompts[0] != approverID(pub) {
-		t.Fatalf("user was not shown the approver fingerprint: %v", console.prompts)
-	}
-	assertPrivate(t, filepath.Join(dir, "approver.json"), false)
-	lease, err := LoadApprover(dir)
-	if err != nil || lease.PublicKeyB64 != base64.StdEncoding.EncodeToString(pub) {
-		t.Fatalf("LoadApprover = %+v, %v", lease, err)
-	}
-	if err := RevokeApprover(dir); err != nil {
-		t.Fatalf("RevokeApprover: %v", err)
-	}
-	if _, err := LoadApprover(dir); !errors.Is(err, ErrNotPaired) {
-		t.Fatalf("after revoke: %v", err)
-	}
-	if err := RevokeApprover(dir); err != nil {
-		t.Fatalf("second revoke: %v", err)
-	}
-
-	refusals := map[string]struct {
-		console *fakeConsole
-		key     []byte
-	}{
-		"no terminal":  {&fakeConsole{interactive: false, confirm: true}, pub},
-		"user refuses": {&fakeConsole{interactive: true, confirm: false}, pub},
-		"short key":    {&fakeConsole{interactive: true, confirm: true}, pub[:31]},
-	}
-	for name, c := range refusals {
-		dir := privateDataDir(t)
-		if err := PairApprover(dir, c.key, c.console); err == nil {
-			t.Errorf("%s: pairing succeeded", name)
-		}
-		if _, err := os.Stat(filepath.Join(dir, "approver.json")); !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("%s: approver lease written", name)
-		}
-	}
-}
-
-func TestPairRunSetup(t *testing.T) {
-	pub := newPublicKey(t)
-	encoded := base64.StdEncoding.EncodeToString(pub)
-	dir := privateDataDir(t)
-	if err := RunPairingSetup(dir, &fakeConsole{interactive: true, confirm: true, pasted: "  " + encoded + "\n"}); err != nil {
-		t.Fatalf("RunPairingSetup: %v", err)
-	}
-	if _, err := LoadApprover(dir); err != nil {
-		t.Fatalf("lease not usable: %v", err)
-	}
-	for name, pasted := range map[string]string{
-		"not base64": "%%%",
-		"31 bytes":   base64.StdEncoding.EncodeToString(pub[:31]),
-		"unpadded":   strings.TrimRight(encoded, "="),
-	} {
-		dir := privateDataDir(t)
-		if err := RunPairingSetup(dir, &fakeConsole{interactive: true, confirm: true, pasted: pasted}); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
-}
-
 func TestPairMalformedLease(t *testing.T) {
 	key := base64.StdEncoding.EncodeToString(newPublicKey(t))
 	cases := map[string]string{
@@ -258,20 +187,6 @@ func TestPairMalformedLease(t *testing.T) {
 	}
 	if _, err := LoadApprover(privateDataDir(t)); !errors.Is(err, ErrNotPaired) {
 		t.Errorf("missing lease: got %v", err)
-	}
-}
-
-func TestPairTokenCannotEnroll(t *testing.T) {
-	dir := privateDataDir(t)
-	if _, err := LoadOrCreateToken(dir, rand.Reader); err != nil {
-		t.Fatal(err)
-	}
-	// Holding the API token gives no terminal: pairing must still be refused.
-	if err := RunPairingSetup(dir, &fakeConsole{interactive: false, confirm: true, pasted: base64.StdEncoding.EncodeToString(newPublicKey(t))}); err == nil {
-		t.Fatal("pairing without an interactive terminal succeeded")
-	}
-	if _, err := LoadApprover(dir); !errors.Is(err, ErrNotPaired) {
-		t.Fatalf("an approver exists after token-only setup: %v", err)
 	}
 }
 
@@ -321,7 +236,7 @@ func TestImportLegacy(t *testing.T) {
 	before, _ := os.ReadFile(filepath.Join(legacy, "whatsapp.db"))
 
 	dir := privateDataDir(t)
-	console := &fakeConsole{interactive: true, confirm: true}
+	console := &fakeConsole{interactive: true, answers: []bool{true, true}}
 	if err := ImportLegacy(legacy, dir, console); err != nil {
 		t.Fatalf("ImportLegacy: %v", err)
 	}
@@ -350,8 +265,8 @@ func TestImportLegacy(t *testing.T) {
 	}
 
 	refusals := map[string]*fakeConsole{
-		"no terminal":  {interactive: false, confirm: true},
-		"user refuses": {interactive: true, confirm: false},
+		"no terminal":  {interactive: false, answers: []bool{true}},
+		"user refuses": {interactive: true, answers: []bool{false}},
 	}
 	for name, console := range refusals {
 		dest := privateDataDir(t)
@@ -368,30 +283,8 @@ func TestImportLegacy(t *testing.T) {
 	db, _ := sql.Open("sqlite", filepath.Join(wrong, "messages.db"))
 	db.Exec("CREATE TABLE unrelated (x INTEGER)")
 	db.Close()
-	if err := ImportLegacy(wrong, privateDataDir(t), &fakeConsole{interactive: true, confirm: true}); err == nil {
+	if err := ImportLegacy(wrong, privateDataDir(t), &fakeConsole{interactive: true, answers: []bool{true}}); err == nil {
 		t.Fatal("imported a database without the expected schema")
-	}
-}
-
-func TestPairCommandOnly(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", "")
-	t.Setenv("LOCALAPPDATA", t.TempDir())
-	var stderr bytes.Buffer
-	for _, args := range [][]string{nil, {"bridge"}, {"setup"}, {"setup", "--pair-pi", "extra"}} {
-		stderr.Reset()
-		if code := run(args, &fakeConsole{}, &stderr); code != 2 || !strings.Contains(stderr.String(), "setup --pair-pi") {
-			t.Errorf("run(%q) = %d, stderr %q", args, code, stderr.String())
-		}
-	}
-	pub := base64.StdEncoding.EncodeToString(newPublicKey(t))
-	if code := run([]string{"setup", "--pair-pi"}, &fakeConsole{interactive: true, confirm: true, pasted: pub}, &stderr); code != 0 {
-		t.Fatalf("setup --pair-pi exit %d: %s", code, stderr.String())
-	}
-	home, _ := os.UserHomeDir()
-	dir, _ := ResolveDataDir(runtime.GOOS, home, os.Getenv("LOCALAPPDATA"), "")
-	if _, err := LoadApprover(dir); err != nil {
-		t.Fatalf("pairing command did not enroll the approver: %v", err)
 	}
 }
 
@@ -406,5 +299,62 @@ func TestTokenLoadOnly(t *testing.T) {
 	created, _ := LoadOrCreateToken(dir, rand.Reader)
 	if loaded, err := LoadToken(dir); err != nil || !bytes.Equal(created, loaded) {
 		t.Fatalf("LoadToken: %v", err)
+	}
+}
+
+func TestPairApprover(t *testing.T) {
+	pub := newPublicKey(t)
+	dir := privateDataDir(t)
+	if err := PairApprover(dir, pub); err != nil {
+		t.Fatalf("PairApprover: %v", err)
+	}
+	assertPrivate(t, filepath.Join(dir, "approver.json"), false)
+	lease, err := LoadApprover(dir)
+	if err != nil || lease.PublicKeyB64 != base64.StdEncoding.EncodeToString(pub) {
+		t.Fatalf("LoadApprover = %+v, %v", lease, err)
+	}
+	other := newPublicKey(t)
+	if err := PairApprover(dir, other); err != nil {
+		t.Fatal(err)
+	}
+	if lease, _ := LoadApprover(dir); lease.PublicKeyB64 != base64.StdEncoding.EncodeToString(other) {
+		t.Fatal("a new pairing must replace the previous one")
+	}
+	if err := RevokeApprover(dir); err != nil {
+		t.Fatalf("RevokeApprover: %v", err)
+	}
+	if _, err := LoadApprover(dir); !errors.Is(err, ErrNotPaired) {
+		t.Fatalf("after revoke: %v", err)
+	}
+	if err := RevokeApprover(dir); err != nil {
+		t.Fatalf("second revoke: %v", err)
+	}
+	if err := PairApprover(privateDataDir(t), pub[:31]); err == nil {
+		t.Fatal("short key accepted")
+	}
+}
+
+func TestPairFromInput(t *testing.T) {
+	pub := newPublicKey(t)
+	encoded := base64.StdEncoding.EncodeToString(pub)
+	dir := filepath.Join(t.TempDir(), "new data dir")
+	id, err := pairPiFromInput(dir, strings.NewReader("  "+encoded+"\n"))
+	if err != nil || id != approverID(pub) {
+		t.Fatalf("pairPiFromInput: %q %v", id, err)
+	}
+	if _, err := LoadApprover(dir); err != nil {
+		t.Fatalf("lease not usable: %v", err)
+	}
+	for name, input := range map[string]string{
+		"empty":      "",
+		"not base64": "%%%",
+		"31 bytes":   base64.StdEncoding.EncodeToString(pub[:31]),
+		"unpadded":   strings.TrimRight(encoded, "="),
+		"two keys":   encoded + "\n" + encoded,
+		"huge":       strings.Repeat("A", 10000),
+	} {
+		if _, err := pairPiFromInput(privateDataDir(t), strings.NewReader(input)); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
 	}
 }

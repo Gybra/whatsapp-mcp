@@ -49,6 +49,7 @@ type APIConfig struct {
 	Token          []byte
 	RevokeApprover func() error
 	Status         func() RuntimeStatus
+	Shutdown       func() // stops the bridge gracefully; used by `whatsapp-mcp stop`
 }
 
 // ReadService answers the read-only tools. Unknown tools and arguments fail with ErrInvalidRequest.
@@ -93,6 +94,7 @@ func NewAPI(cfg APIConfig, approvals *ApprovalManager, freeze func(context.Conte
 	mux.HandleFunc("DELETE /api/approver", a.revokeApprover)
 	mux.HandleFunc("POST /api/read/{tool}", a.read)
 	mux.HandleFunc("POST /api/download", a.download)
+	mux.HandleFunc("POST /api/shutdown", a.shutdown)
 	return a.guard(mux)
 }
 
@@ -197,6 +199,15 @@ func (a *api) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, receipt)
+}
+
+func (a *api) shutdown(w http.ResponseWriter, r *http.Request) {
+	if a.cfg.Shutdown == nil {
+		writeError(w, ErrNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+	a.cfg.Shutdown()
 }
 
 // revokeApprover only removes trust; enrolling an approver is not possible through the API.

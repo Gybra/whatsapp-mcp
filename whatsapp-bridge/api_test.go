@@ -331,6 +331,21 @@ func TestNoEnrollmentAPI(t *testing.T) {
 	}
 }
 
+func TestAPIShutdownRoute(t *testing.T) {
+	a := newAPITest(t)
+	stopped := 0
+	a.handler = NewAPI(APIConfig{Token: decodeHex(t, a.token), Shutdown: func() { stopped++ }}, a.manager, fakeFreeze, a.sender, a.reads)
+	if rec := a.request("POST", "/api/shutdown", "", func(r *http.Request) { r.Header.Del("Authorization") }); rec.Code != http.StatusUnauthorized || stopped != 0 {
+		t.Fatal("shutdown without the token")
+	}
+	if rec := a.request("GET", "/api/shutdown", ""); rec.Code != http.StatusMethodNotAllowed || stopped != 0 {
+		t.Fatal("shutdown with GET")
+	}
+	if rec := a.request("POST", "/api/shutdown", ""); rec.Code != http.StatusAccepted || stopped != 1 {
+		t.Fatalf("shutdown: %d, stopped %d", rec.Code, stopped)
+	}
+}
+
 func TestAPIStatus(t *testing.T) {
 	a := newAPITest(t)
 	var status APIStatus

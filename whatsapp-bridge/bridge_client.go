@@ -60,6 +60,15 @@ func (c *BridgeClient) Send(ctx context.Context, input SendInput, approval *Appr
 	return receipt, err
 }
 
+func (c *BridgeClient) Status(ctx context.Context) (APIStatus, error) {
+	var status APIStatus
+	return status, c.transportError(c.do(ctx, http.MethodGet, "/api/status", nil, &status))
+}
+
+func (c *BridgeClient) Shutdown(ctx context.Context) error {
+	return c.transportError(c.do(ctx, http.MethodPost, "/api/shutdown", nil, nil))
+}
+
 func (c *BridgeClient) Read(ctx context.Context, tool string, request, result any) error {
 	if !readToolName.MatchString(tool) {
 		return ErrInvalidRequest
@@ -86,17 +95,23 @@ func (c *BridgeClient) transportError(err error) error {
 }
 
 func (c *BridgeClient) do(ctx context.Context, method, path string, body, result any) error {
-	data, err := json.Marshal(body)
-	if err != nil {
-		return ErrInvalidRequest
+	var reader io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return ErrInvalidRequest
+		}
+		reader = bytes.NewReader(data)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
 	if err != nil {
 		return ErrInvalidRequest
 	}
 	req.Host = apiAddress // the bridge only answers to its own address
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		var netErr *net.OpError
@@ -106,7 +121,7 @@ func (c *BridgeClient) do(ctx context.Context, method, path string, body, result
 		return errRequestInterrupted
 	}
 	defer resp.Body.Close()
-	data, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return errRequestInterrupted
 	}

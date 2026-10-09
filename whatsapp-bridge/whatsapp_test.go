@@ -253,6 +253,22 @@ func TestAdapterSendRequiresFrozenDraft(t *testing.T) {
 	}
 }
 
+func TestOfflineSyncSignalled(t *testing.T) {
+	runtime, _ := newTestRuntime(t, nil)
+	select {
+	case <-runtime.synced:
+		t.Fatal("synced before any sync")
+	default:
+	}
+	runtime.handleEvent(&events.OfflineSyncCompleted{Count: 3})
+	runtime.handleEvent(&events.OfflineSyncCompleted{Count: 0}) // a second event must not panic
+	select {
+	case <-runtime.synced:
+	default:
+		t.Fatal("offline sync completion not signalled")
+	}
+}
+
 func TestTerminalDisconnectPreservesSession(t *testing.T) {
 	for name, event := range map[string]any{
 		"logged out":      &events.LoggedOut{},
@@ -391,7 +407,10 @@ func TestUnpairedRuntimeLookups(t *testing.T) {
 	if name := runtime.contactName(ctx, adaPN); name != "" {
 		t.Fatalf("contactName on an unpaired device: %q", name)
 	}
-	if err := runtime.Connect(ctx, nil); !errors.Is(err, ErrNotPaired) {
+	if err := runtime.Connect(ctx); !errors.Is(err, ErrNotPaired) {
 		t.Fatalf("connecting without a session must not start pairing: %v", err)
+	}
+	if !runtime.client.EnableAutoReconnect || !runtime.client.InitialAutoReconnect {
+		t.Fatal("the bridge must keep retrying when the network is down at startup")
 	}
 }

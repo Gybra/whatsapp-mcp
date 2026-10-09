@@ -33,14 +33,11 @@ var (
 	errCancelled  = errors.New("cancelled")
 )
 
-// TrustedConsole is the local terminal through which the user confirms trust
-// decisions. It stops automation without a terminal; it does not stop a process
-// running as the same user that drives a pseudo-terminal.
+// TrustedConsole is the local terminal through which the user confirms
+// destructive or account-changing steps of the command-line setup.
 type TrustedConsole interface {
 	IsInteractive() bool
-	ReadPublicKey() (string, error)
-	ConfirmFingerprint(fingerprint string) (bool, error)
-	ConfirmImport(description string) (bool, error)
+	Confirm(question string) (bool, error)
 }
 
 // ResolveDataDir returns the per-user directory holding the session, messages and credentials.
@@ -202,21 +199,13 @@ func LoadApprover(dataDir string) (ApproverLease, error) {
 	return lease, nil
 }
 
-// PairApprover trusts publicKey to approve sends after the user confirms its fingerprint.
-// It replaces any earlier pairing.
-func PairApprover(dataDir string, publicKey []byte, console TrustedConsole) error {
-	if !console.IsInteractive() {
-		return errNoTerminal
-	}
+// PairApprover trusts publicKey to approve sends, replacing any earlier pairing.
+// The Pi extension calls it through `whatsapp-mcp pair-pi` after the user confirms
+// in Pi. Any process running as the same user could write this file too, which
+// is why the threat model excludes such processes.
+func PairApprover(dataDir string, publicKey []byte) error {
 	if len(publicKey) != ed25519.PublicKeySize {
 		return errors.New("an approver public key is 32 bytes")
-	}
-	confirmed, err := console.ConfirmFingerprint(approverID(publicKey))
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		return errCancelled
 	}
 	lease, err := json.Marshal(ApproverLease{PublicKeyB64: base64.StdEncoding.EncodeToString(publicKey)})
 	if err != nil {
@@ -234,23 +223,23 @@ func RevokeApprover(dataDir string) error {
 	return err
 }
 
-// RunPairingSetup reads the approver key pasted by the user and enrolls it after confirmation.
-func RunPairingSetup(dataDir string, console TrustedConsole) error {
-	if !console.IsInteractive() {
-		return errNoTerminal
-	}
-	pasted, err := console.ReadPublicKey()
+// pairPiFromInput reads one base64 public key from input and pairs it, returning its fingerprint.
+func pairPiFromInput(dataDir string, input io.Reader) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(input, 256))
 	if err != nil {
-		return err
+		return "", err
 	}
-	key, ok := decodeCanonicalB64(strings.TrimSpace(pasted))
+	key, ok := decodeCanonicalB64(strings.TrimSpace(string(data)))
 	if !ok || len(key) != ed25519.PublicKeySize {
-		return errors.New("that is not the public key shown by /whatsapp-pair")
+		return "", errors.New("expected one base64 Ed25519 public key on standard input")
 	}
 	if err := EnsurePrivateDir(dataDir); err != nil {
-		return err
+		return "", err
 	}
-	return PairApprover(dataDir, key, console)
+	if err := PairApprover(dataDir, key); err != nil {
+		return "", err
+	}
+	return approverID(key), nil
 }
 
 var legacyTables = map[string][]string{
@@ -288,8 +277,8 @@ func ImportLegacy(source, dataDir string, console TrustedConsole) error {
 	if len(names) == 0 {
 		return fmt.Errorf("no messages.db or whatsapp.db found in %s", source)
 	}
-	confirmed, err := console.ConfirmImport(fmt.Sprintf(
-		"Import %s from %s into %s.\nStop the old bridge first: two bridges on one WhatsApp session conflict.\nThe original files are not modified and remain your backup.",
+	confirmed, err := console.Confirm(fmt.Sprintf(
+		"Import %s from %s into %s.\nStop the old bridge first: two bridges on one WhatsApp session conflict.\nThe original files are not modified and remain your backup.\nImport now?",
 		strings.Join(names, " and "), source, dataDir))
 	if err != nil {
 		return err
@@ -373,19 +362,8 @@ func (c *terminalConsole) IsInteractive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-func (c *terminalConsole) ReadPublicKey() (string, error) {
-	fmt.Print("Paste the public key shown by /whatsapp-pair in Pi: ")
-	return c.readLine()
-}
-
-func (c *terminalConsole) ConfirmFingerprint(fingerprint string) (bool, error) {
-	fmt.Printf("\nApprover fingerprint:\n  %s\n\nCheck that Pi shows the same fingerprint. That Pi session will be able to approve\noutgoing WhatsApp messages until Pi quits or reloads.\nType \"yes\" to trust it: ", fingerprint)
-	answer, err := c.readLine()
-	return answer == "yes", err
-}
-
-func (c *terminalConsole) ConfirmImport(description string) (bool, error) {
-	fmt.Printf("%s\nType \"yes\" to import: ", description)
+func (c *terminalConsole) Confirm(question string) (bool, error) {
+	fmt.Printf("%s Type \"yes\" to continue: ", question)
 	answer, err := c.readLine()
 	return answer == "yes", err
 }

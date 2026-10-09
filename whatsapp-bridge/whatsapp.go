@@ -62,8 +62,10 @@ type WhatsAppRuntime struct {
 	groupName   func(context.Context, types.JID) string
 	download    func(context.Context, whatsmeow.DownloadableMessage) ([]byte, error)
 
-	mu    sync.Mutex
-	state string
+	mu         sync.Mutex
+	state      string
+	synced     chan struct{} // closed when WhatsApp has delivered the messages queued while offline
+	syncedOnce sync.Once
 }
 
 func NewWhatsAppRuntime(cfg RuntimeConfig, store *MessageStore) (*WhatsAppRuntime, error) {
@@ -129,46 +131,54 @@ func NewWhatsAppRuntime(cfg RuntimeConfig, store *MessageStore) (*WhatsAppRuntim
 		},
 		download: client.Download,
 		state:    "offline",
+		synced:   make(chan struct{}),
 	}
 	if device.ID == nil {
 		r.state = "unpaired"
 	}
 	// Reconnect after network problems, never after WhatsApp ended the session.
 	client.EnableAutoReconnect = true
+	client.InitialAutoReconnect = true // also keep retrying when there is no network at startup
 	client.AutoReconnectHook = func(error) bool { return r.Status().State != "action_required" }
 	client.AddEventHandler(r.handleEvent)
 	return r, nil
 }
 
-// Connect connects an existing session. With onQR it pairs a new device instead,
-// passing each QR code to onQR; without it an unpaired runtime stays unpaired.
-func (r *WhatsAppRuntime) Connect(ctx context.Context, onQR func(code string)) error {
-	if r.client.Store.ID != nil {
-		r.setState("connecting")
-		return r.client.Connect()
-	}
-	if onQR == nil {
+// Connect connects an existing session. It never starts linking a new device.
+func (r *WhatsAppRuntime) Connect(ctx context.Context) error {
+	if r.client.Store.ID == nil {
 		return ErrNotPaired
+	}
+	r.setState("connecting")
+	return r.client.Connect()
+}
+
+var errAlreadyLinked = errors.New("this computer is already linked to WhatsApp")
+
+// Link links this computer as a new WhatsApp device through a QR code, then stays
+// connected briefly so the messages WhatsApp sends to a new device are stored.
+func (r *WhatsAppRuntime) Link(ctx context.Context, out func(LinkEvent), confirm func(code string) (bool, error)) error {
+	if r.client.Store.ID != nil {
+		return errAlreadyLinked
 	}
 	codes, err := r.client.GetQRChannel(ctx)
 	if err != nil {
 		return err
 	}
 	if err := r.client.Connect(); err != nil {
+		return fmt.Errorf("could not reach WhatsApp: %w", err)
+	}
+	defer r.client.Disconnect()
+	if err := runLink(ctx, codes, out, confirm, r.client.SendPasskeyConfirmation); err != nil {
 		return err
 	}
-	for item := range codes {
-		switch item.Event {
-		case whatsmeow.QRChannelEventCode:
-			onQR(item.Code)
-		case whatsmeow.QRChannelSuccess.Event:
-			return nil
-		default:
-			r.client.Disconnect()
-			return fmt.Errorf("pairing did not complete (%s)", item.Event)
-		}
+	out(LinkEvent{Event: "notice", Message: "Receiving recent messages…"})
+	select {
+	case <-r.synced:
+	case <-time.After(45 * time.Second):
+	case <-ctx.Done():
 	}
-	return errors.New("pairing did not complete")
+	return nil
 }
 
 func (r *WhatsAppRuntime) Status() RuntimeStatus {
@@ -215,6 +225,8 @@ func (r *WhatsAppRuntime) handleEvent(evt any) {
 		r.storeMessage(ctx, e, "")
 	case *events.HistorySync:
 		r.storeHistory(e)
+	case *events.OfflineSyncCompleted:
+		r.syncedOnce.Do(func() { close(r.synced) })
 	}
 }
 

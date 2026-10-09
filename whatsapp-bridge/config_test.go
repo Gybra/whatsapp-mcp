@@ -297,7 +297,7 @@ func TestDataSetupKeepsSessionAndToken(t *testing.T) {
 func writeLegacyStore(t *testing.T, dir string) {
 	t.Helper()
 	os.MkdirAll(dir, 0o700)
-	messages, err := sql.Open("sqlite3", filepath.Join(dir, "messages.db"))
+	messages, err := sql.Open("sqlite", filepath.Join(dir, "messages.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func writeLegacyStore(t *testing.T, dir string) {
 	if _, err := messages.Exec(messageSchema + `INSERT INTO chats VALUES ('12025550123@s.whatsapp.net', 'Legacy', '2025-03-01 10:00:00');`); err != nil {
 		t.Fatal(err)
 	}
-	session, err := sql.Open("sqlite3", filepath.Join(dir, "whatsapp.db"))
+	session, err := sql.Open("sqlite", filepath.Join(dir, "whatsapp.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestImportLegacy(t *testing.T) {
 
 	wrong := filepath.Join(t.TempDir(), "store")
 	os.MkdirAll(wrong, 0o700)
-	db, _ := sql.Open("sqlite3", filepath.Join(wrong, "messages.db"))
+	db, _ := sql.Open("sqlite", filepath.Join(wrong, "messages.db"))
 	db.Exec("CREATE TABLE unrelated (x INTEGER)")
 	db.Close()
 	if err := ImportLegacy(wrong, privateDataDir(t), &fakeConsole{interactive: true, confirm: true}); err == nil {

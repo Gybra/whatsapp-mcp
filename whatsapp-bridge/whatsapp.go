@@ -77,8 +77,13 @@ func NewWhatsAppRuntime(cfg RuntimeConfig, store *MessageStore) (*WhatsAppRuntim
 	}
 	waLogger := newRedactingLogger(logger)
 	ctx := context.Background()
-	container, err := sqlstore.New(ctx, "sqlite3", session+"?_foreign_keys=on", waLogger.Sub("Database"))
+	db, err := openSQLite(session)
 	if err != nil {
+		return nil, fmt.Errorf("open session database: %w", err)
+	}
+	container := sqlstore.NewWithDB(db, "sqlite3", waLogger.Sub("Database")) // "sqlite3" names the SQL dialect
+	if err := container.Upgrade(ctx); err != nil {
+		container.Close()
 		return nil, fmt.Errorf("open session database: %w", err)
 	}
 	device, err := container.GetFirstDevice(ctx)

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -310,11 +309,7 @@ func ImportLegacy(source, dataDir string, console TrustedConsole) error {
 }
 
 func openReadOnlySQLite(path string) (*sql.DB, error) {
-	slashed := filepath.ToSlash(path)
-	if !strings.HasPrefix(slashed, "/") {
-		slashed = "/" + slashed // Windows drive paths
-	}
-	return sql.Open("sqlite3", (&url.URL{Scheme: "file", Path: slashed, RawQuery: "mode=ro"}).String())
+	return sql.Open("sqlite", sqliteURI(path, "mode=ro"))
 }
 
 func checkLegacySchema(path string, tables []string) error {

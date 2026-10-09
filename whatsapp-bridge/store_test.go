@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -225,7 +226,7 @@ func TestStoreDuplicateMessages(t *testing.T) {
 
 func TestStoreTimestampFormatsAndLegacySchema(t *testing.T) {
 	dir := privateDataDir(t)
-	legacy, err := sql.Open("sqlite3", filepath.Join(dir, "messages.db"))
+	legacy, err := sql.Open("sqlite", filepath.Join(dir, "messages.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,3 +269,26 @@ CREATE TABLE messages (
 	PRIMARY KEY (id, chat_jid), FOREIGN KEY (chat_jid) REFERENCES chats(jid)
 );
 `
+
+func TestStoreUnusualDataDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "Ada's data #1 ?50% & more")
+	if err := EnsurePrivateDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	store, err := OpenMessageStore(dir)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer store.Close()
+	if err := store.StoreChat(context.Background(), adaJID, "Ada", t0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "messages.db")); err != nil {
+		t.Fatalf("database not created inside the directory: %v", err)
+	}
+	var fk int
+	store.db.QueryRow("PRAGMA foreign_keys").Scan(&fk)
+	if fk != 1 {
+		t.Fatal("foreign keys are off")
+	}
+}

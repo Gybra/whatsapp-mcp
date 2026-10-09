@@ -8,13 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite" // pure Go: no C compiler needed on any platform
 )
 
 const messageSchema = `
@@ -63,6 +64,21 @@ const (
 )
 
 var phoneNumber = regexp.MustCompile(`^[1-9][0-9]{5,14}$`)
+
+// openSQLite opens a database file with foreign keys on and a busy timeout,
+// so the bridge and a short-lived reader do not fail on each other's locks.
+func openSQLite(path string) (*sql.DB, error) {
+	return sql.Open("sqlite", sqliteURI(path, "_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"))
+}
+
+// sqliteURI builds a file: URI, so paths with spaces or '?' are not misread as options.
+func sqliteURI(path, query string) string {
+	slashed := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashed, "/") {
+		slashed = "/" + slashed // Windows drive paths
+	}
+	return (&url.URL{Scheme: "file", Path: slashed, RawQuery: query}).String()
+}
 
 // MessageStore is the bridge's message history database.
 type MessageStore struct {
@@ -172,13 +188,10 @@ func OpenMessageStore(dataDir string) (*MessageStore, error) {
 		return nil, err
 	}
 	path := filepath.Join(dataDir, "messages.db")
-	if strings.ContainsAny(path, "?#") {
-		return nil, errors.New("the data directory path must not contain '?' or '#'")
-	}
 	if err := EnsurePrivateFile(path); err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite3", path+"?_foreign_keys=on")
+	db, err := openSQLite(path)
 	if err != nil {
 		return nil, fmt.Errorf("open message database: %w", err)
 	}

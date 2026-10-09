@@ -394,3 +394,17 @@ func TestPairCommandOnly(t *testing.T) {
 		t.Fatalf("pairing command did not enroll the approver: %v", err)
 	}
 }
+
+func TestTokenLoadOnly(t *testing.T) {
+	dir := privateDataDir(t)
+	if _, err := LoadToken(dir); err == nil {
+		t.Fatal("LoadToken succeeded without a token")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "api-token")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("LoadToken created a token")
+	}
+	created, _ := LoadOrCreateToken(dir, rand.Reader)
+	if loaded, err := LoadToken(dir); err != nil || !bytes.Equal(created, loaded) {
+		t.Fatalf("LoadToken: %v", err)
+	}
+}

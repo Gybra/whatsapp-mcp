@@ -118,50 +118,51 @@ type MessageContextRecord struct {
 	After   []MessageRecord `json:"after"`
 }
 
-// Request types of the read tools. Pointers tell an omitted field from an explicit zero or false.
+// Request types of the read tools, also used as the MCP input schemas. Pointers tell
+// an omitted field from an explicit zero or false; omitempty marks optional fields.
 type (
 	ContactFilter struct {
-		Query string `json:"query"`
+		Query string `json:"query" jsonschema:"text to match against contact names and phone numbers"`
 	}
 	MessageFilter struct {
-		After             string `json:"after"`
-		Before            string `json:"before"`
-		SenderPhoneNumber string `json:"sender_phone_number"`
-		ChatJID           string `json:"chat_jid"`
-		Query             string `json:"query"`
-		Limit             *int   `json:"limit"`
-		Page              *int   `json:"page"`
-		IncludeContext    *bool  `json:"include_context"`
-		ContextBefore     *int   `json:"context_before"`
-		ContextAfter      *int   `json:"context_after"`
+		After             string `json:"after,omitempty" jsonschema:"only messages after this ISO-8601 time or date"`
+		Before            string `json:"before,omitempty" jsonschema:"only messages before this ISO-8601 time or date"`
+		SenderPhoneNumber string `json:"sender_phone_number,omitempty" jsonschema:"only messages from this phone number (country code, digits only)"`
+		ChatJID           string `json:"chat_jid,omitempty" jsonschema:"only messages in this chat"`
+		Query             string `json:"query,omitempty" jsonschema:"only messages containing this text (case-insensitive)"`
+		Limit             *int   `json:"limit,omitempty" jsonschema:"maximum number of matches, 1-100 (default 20)"`
+		Page              *int   `json:"page,omitempty" jsonschema:"page of results, starting at 0"`
+		IncludeContext    *bool  `json:"include_context,omitempty" jsonschema:"also return messages around each match (default true)"`
+		ContextBefore     *int   `json:"context_before,omitempty" jsonschema:"messages before each match, 0-10 (default 1)"`
+		ContextAfter      *int   `json:"context_after,omitempty" jsonschema:"messages after each match, 0-10 (default 1)"`
 	}
 	ChatFilter struct {
-		Query              string `json:"query"`
-		Limit              *int   `json:"limit"`
-		Page               *int   `json:"page"`
-		IncludeLastMessage *bool  `json:"include_last_message"`
-		SortBy             string `json:"sort_by"`
+		Query              string `json:"query,omitempty" jsonschema:"only chats whose name or JID contains this text"`
+		Limit              *int   `json:"limit,omitempty" jsonschema:"maximum number of chats, 1-100 (default 20)"`
+		Page               *int   `json:"page,omitempty" jsonschema:"page of results, starting at 0"`
+		IncludeLastMessage *bool  `json:"include_last_message,omitempty" jsonschema:"include each chat's latest message (default true)"`
+		SortBy             string `json:"sort_by,omitempty" jsonschema:"last_active (default) or name"`
 	}
 	ChatRequest struct {
-		ChatJID            string `json:"chat_jid"`
-		IncludeLastMessage *bool  `json:"include_last_message"`
+		ChatJID            string `json:"chat_jid" jsonschema:"the chat's JID"`
+		IncludeLastMessage *bool  `json:"include_last_message,omitempty" jsonschema:"include the latest message (default true)"`
 	}
 	DirectChatRequest struct {
-		SenderPhoneNumber string `json:"sender_phone_number"`
+		SenderPhoneNumber string `json:"sender_phone_number" jsonschema:"phone number with country code, digits only"`
 	}
 	ContactChatsRequest struct {
-		JID   string `json:"jid"`
-		Limit *int   `json:"limit"`
-		Page  *int   `json:"page"`
+		JID   string `json:"jid" jsonschema:"the contact's JID"`
+		Limit *int   `json:"limit,omitempty" jsonschema:"maximum number of chats, 1-100 (default 20)"`
+		Page  *int   `json:"page,omitempty" jsonschema:"page of results, starting at 0"`
 	}
 	InteractionRequest struct {
-		JID string `json:"jid"`
+		JID string `json:"jid" jsonschema:"the contact's JID"`
 	}
 	ContextRequest struct {
-		MessageID string `json:"message_id"`
-		ChatJID   string `json:"chat_jid"`
-		Before    *int   `json:"before"`
-		After     *int   `json:"after"`
+		MessageID string `json:"message_id" jsonschema:"the message ID"`
+		ChatJID   string `json:"chat_jid,omitempty" jsonschema:"the chat containing the message; needed when the ID exists in several chats"`
+		Before    *int   `json:"before,omitempty" jsonschema:"messages before, 0-10 (default 5)"`
+		After     *int   `json:"after,omitempty" jsonschema:"messages after, 0-10 (default 5)"`
 	}
 )
 

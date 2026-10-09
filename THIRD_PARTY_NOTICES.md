@@ -12,23 +12,30 @@ Modules compiled into the bridge (from `go list -deps`, with each license identi
 | github.com/beeper/argo-go | v1.1.2 | MIT |
 | github.com/coder/websocket | v1.8.15 | ISC |
 | github.com/elliotchance/orderedmap/v3 | v3.1.0 | MIT |
+| github.com/google/jsonschema-go | v0.4.3 | MIT |
 | github.com/google/uuid | v1.6.0 | BSD-3-Clause |
 | github.com/mattn/go-colorable | v0.1.14 | MIT |
 | github.com/mattn/go-isatty | v0.0.20 | MIT |
 | github.com/mattn/go-sqlite3 | v1.14.52 | MIT (bundles SQLite, which is in the public domain) |
+| github.com/modelcontextprotocol/go-sdk | v1.8.0 | Apache-2.0 for new contributions, MIT for earlier ones (see its LICENSE) |
 | github.com/petermattis/goid | v0.0.0-20260820044319-269ab09b5261 | Apache-2.0 |
 | github.com/rs/zerolog | v1.35.1 | MIT |
+| github.com/segmentio/asm | v1.1.3 | MIT |
+| github.com/segmentio/encoding | v0.5.4 | MIT |
 | github.com/vektah/gqlparser/v2 | v2.5.27 | MIT |
+| github.com/yosida95/uritemplate/v3 | v3.0.2 | BSD-3-Clause |
 | go.mau.fi/libsignal | v0.2.2 | **GPL-3.0** |
 | go.mau.fi/util | v0.10.1 | MPL-2.0 |
 | go.mau.fi/whatsmeow | v0.0.0-20261007111105-c386243a72ba | MPL-2.0 |
 | golang.org/x/crypto | v0.57.0 | BSD-3-Clause |
 | golang.org/x/exp | v0.0.0-20260908205506-85c1c2202aba | BSD-3-Clause |
 | golang.org/x/net | v0.60.0 | BSD-3-Clause |
+| golang.org/x/oauth2 | v0.35.0 | BSD-3-Clause |
 | golang.org/x/sync | v0.23.0 | BSD-3-Clause |
 | golang.org/x/sys | v0.49.0 | BSD-3-Clause |
 | golang.org/x/term | v0.46.0 | BSD-3-Clause |
 | golang.org/x/text | v0.42.0 | BSD-3-Clause |
+| golang.org/x/time | v0.15.0 | BSD-3-Clause |
 | google.golang.org/protobuf | v1.36.12 | BSD-3-Clause |
 
 The Go standard library and runtime are licensed under the BSD-3-Clause license.

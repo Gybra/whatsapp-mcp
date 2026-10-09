@@ -163,6 +163,20 @@ func LoadOrCreateToken(dataDir string, random io.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseToken(path, data)
+}
+
+// LoadToken reads the existing API token without ever creating one.
+func LoadToken(dataDir string) ([]byte, error) {
+	path := filepath.Join(dataDir, tokenFile)
+	data, err := readPrivateFile(path, 128)
+	if err != nil {
+		return nil, err
+	}
+	return parseToken(path, data)
+}
+
+func parseToken(path string, data []byte) ([]byte, error) {
 	token, err := hex.DecodeString(string(data))
 	if err != nil || len(token) != 32 {
 		return nil, fmt.Errorf("the API token in %s is corrupt: remove it and run setup again", path)

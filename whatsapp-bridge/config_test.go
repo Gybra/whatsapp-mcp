@@ -53,15 +53,16 @@ func newPublicKey(t *testing.T) ed25519.PublicKey {
 }
 
 func TestDataDirResolution(t *testing.T) {
-	home := filepath.FromSlash("/home/ada")
+	root := t.TempDir() // absolute on every OS, unlike "/home/ada" on Windows
+	home, xdg, localAppData := filepath.Join(root, "home", "ada"), filepath.Join(root, "data", "xdg"), filepath.Join(root, "AppData", "Local")
 	cases := []struct {
 		platform, localAppData, xdg, want string
 	}{
 		{"darwin", "", "", filepath.Join(home, "Library", "Application Support", "whatsapp-mcp")},
 		{"linux", "", "", filepath.Join(home, ".local", "share", "whatsapp-mcp")},
-		{"linux", "", filepath.FromSlash("/data/xdg"), filepath.Join(filepath.FromSlash("/data/xdg"), "whatsapp-mcp")},
+		{"linux", "", xdg, filepath.Join(xdg, "whatsapp-mcp")},
 		{"linux", "", "relative/xdg", filepath.Join(home, ".local", "share", "whatsapp-mcp")},
-		{"windows", filepath.FromSlash("/AppData/Local"), "", filepath.Join(filepath.FromSlash("/AppData/Local"), "whatsapp-mcp")},
+		{"windows", localAppData, "", filepath.Join(localAppData, "whatsapp-mcp")},
 	}
 	for _, c := range cases {
 		got, err := ResolveDataDir(c.platform, home, c.localAppData, c.xdg)

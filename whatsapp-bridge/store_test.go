@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -271,7 +272,11 @@ CREATE TABLE messages (
 `
 
 func TestStoreUnusualDataDir(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "Ada's data #1 ?50% & more")
+	name := "Ada's data #1 ?50% & more"
+	if runtime.GOOS == "windows" {
+		name = strings.ReplaceAll(name, "?", "") // not allowed in Windows file names
+	}
+	dir := filepath.Join(t.TempDir(), name)
 	if err := EnsurePrivateDir(dir); err != nil {
 		t.Fatal(err)
 	}

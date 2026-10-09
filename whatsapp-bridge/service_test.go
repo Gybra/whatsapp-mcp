@@ -95,7 +95,9 @@ func TestServiceSystemdUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(unit)
-	wantExec := `ExecStart="` + filepath.Join(cfg.Home, `Apps & \"Tools\" 100%%`, "whatsapp-mcp$$1") + `" bridge`
+	// Only Windows test hosts produce backslashes in the path; systemd needs them doubled.
+	sep := strings.ReplaceAll(string(filepath.Separator), `\`, `\\`)
+	wantExec := `ExecStart="` + strings.ReplaceAll(cfg.Home, `\`, `\\`) + sep + `Apps & \"Tools\" 100%%` + sep + `whatsapp-mcp$$1" bridge`
 	for _, want := range []string{serviceMarker, wantExec, "Restart=on-failure", "RestartSec=30", "StartLimitBurst=5", "UMask=0077", "WantedBy=default.target"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("unit lacks %q:\n%s", want, text)

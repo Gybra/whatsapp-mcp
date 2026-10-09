@@ -4,13 +4,14 @@ package main
 
 import (
 	"os"
-	"strings"
 	"testing"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-// assertPrivate checks for a protected DACL with a single entry for the current user.
+// assertPrivate checks for a protected DACL whose entries all allow only the current user.
+// Directories get two entries for that user: one for the directory and one inherited by its contents.
 func assertPrivate(t *testing.T, path string, dir bool) {
 	t.Helper()
 	info, err := os.Lstat(path)
@@ -25,8 +26,21 @@ func assertPrivate(t *testing.T, path string, dir bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sddl := sd.String()
-	if !strings.Contains(sddl, "D:P") || strings.Count(sddl, "(A;") != 1 || !strings.Contains(sddl, user.String()) {
-		t.Fatalf("%s: DACL %s is not private to %s", path, sddl, user)
+	control, _, err := sd.Control()
+	if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
+		t.Fatalf("%s: DACL %s inherits from its parent (%v)", path, sd, err)
+	}
+	dacl, _, err := sd.DACL()
+	if err != nil || dacl == nil || dacl.AceCount == 0 {
+		t.Fatalf("%s: no DACL entries in %s (%v)", path, sd, err)
+	}
+	for i := range dacl.AceCount {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		if err := windows.GetAce(dacl, uint32(i), &ace); err != nil {
+			t.Fatal(err)
+		}
+		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE || !(*windows.SID)(unsafe.Pointer(&ace.SidStart)).Equals(user) {
+			t.Fatalf("%s: DACL %s is not private to %s", path, sd, user)
+		}
 	}
 }

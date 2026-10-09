@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
@@ -124,7 +125,7 @@ func TestDataSQLiteSidecarsArePrivate(t *testing.T) {
 	if _, err := store.db.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.StoreChat("12025550123@s.whatsapp.net", "Test", time.Unix(1_800_000_000, 0)); err != nil {
+	if err := store.StoreChat(context.Background(), "12025550123@s.whatsapp.net", "Test", time.Unix(1_800_000_000, 0)); err != nil {
 		t.Fatalf("StoreChat: %v", err)
 	}
 	entries, _ := os.ReadDir(dir)

@@ -54,7 +54,7 @@ type APIConfig struct {
 // ReadService answers the read-only tools. Unknown tools and arguments fail with ErrInvalidRequest.
 type ReadService interface {
 	Read(ctx context.Context, tool string, request json.RawMessage) (any, error)
-	Download(ctx context.Context, messageID, chatJID string) (AttachmentView, error)
+	Download(ctx context.Context, messageID, chatJID string) (DownloadedMedia, error)
 }
 
 type SendRequest struct {
@@ -307,6 +307,9 @@ var errorStatus = []struct {
 }{
 	{ErrInvalidRequest, http.StatusBadRequest},
 	{ErrNotFound, http.StatusNotFound},
+	{ErrMediaNotFound, http.StatusNotFound},
+	{ErrUnsupportedMedia, http.StatusUnsupportedMediaType},
+	{ErrSecretRejected, http.StatusUnprocessableEntity},
 	{ErrNotPaired, http.StatusConflict},
 	{ErrApprovalRequired, http.StatusForbidden},
 	{ErrApprovalInvalid, http.StatusForbidden},

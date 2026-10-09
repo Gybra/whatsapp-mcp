@@ -29,3 +29,13 @@ func securePath(path string, info fs.FileInfo) error {
 	}
 	return nil
 }
+
+// openNonBlocking keeps a file swapped for a FIFO between inspection and open from blocking the open.
+const openNonBlocking = syscall.O_NONBLOCK
+
+func linkCount(info fs.FileInfo) uint64 {
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		return uint64(stat.Nlink)
+	}
+	return 1
+}

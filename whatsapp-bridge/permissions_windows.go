@@ -55,3 +55,8 @@ func currentUserSID() (*windows.SID, error) {
 	}
 	return user.User.Sid, nil
 }
+
+const openNonBlocking = 0
+
+// shortcut: hard links are not detected on Windows (needs GetFileInformationByHandle); add it if Windows support ships.
+func linkCount(fs.FileInfo) uint64 { return 1 }

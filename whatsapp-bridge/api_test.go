@@ -51,8 +51,8 @@ func (r *fakeReads) Read(ctx context.Context, tool string, request json.RawMessa
 	return r.result, r.err
 }
 
-func (r *fakeReads) Download(ctx context.Context, messageID, chatJID string) (AttachmentView, error) {
-	return AttachmentView{ID: "dl-1", Name: "photo.jpg", MIME: "image/jpeg", Size: 3, SHA256: strings.Repeat("a", 64)}, r.err
+func (r *fakeReads) Download(ctx context.Context, messageID, chatJID string) (DownloadedMedia, error) {
+	return DownloadedMedia{AttachmentView{ID: "dl-1", Name: "photo.jpg", MIME: "image/jpeg", Size: 3, SHA256: strings.Repeat("a", 64)}, "/data/downloads/dl-1.jpg"}, r.err
 }
 
 func fakeFreeze(_ context.Context, in SendInput) (FrozenDraft, error) {

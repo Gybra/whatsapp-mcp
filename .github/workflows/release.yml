@@ -1,0 +1,55 @@
+name: Release
+
+# Builds the binaries for a version tag (vX.Y.Z) and creates a draft release.
+# A maintainer reviews the draft and publishes it by hand.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: whatsapp-bridge
+    env:
+      GOTOOLCHAIN: local
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache: false
+      - run: go test -count=1 ./...
+      - name: Build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p ../dist
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*}; arch=${target#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$version" -o "../dist/whatsapp-mcp-$os-$arch$ext" .
+          done
+          cd ../dist && sha256sum whatsapp-mcp-* > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/whatsapp-mcp-*
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > ../dist/NOTES.md <<NOTES
+          Binaries for whatsapp-mcp ${GITHUB_REF_NAME}, built from [this tag's source](https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_REF_NAME}).
+
+          Check a download against \`SHA256SUMS\`, or verify its build provenance with \`gh attestation verify <file> --repo ${GITHUB_REPOSITORY}\`.
+
+          The source code is MIT licensed. These binaries include GPL-3.0 and MPL-2.0 libraries and are distributed under the terms of the GPL-3.0; the corresponding source is the tagged source linked above. See THIRD_PARTY_NOTICES.md.
+
+          Unofficial: not affiliated with WhatsApp or Meta.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "whatsapp-mcp ${GITHUB_REF_NAME}" --notes-file ../dist/NOTES.md ../dist/whatsapp-mcp-* ../dist/SHA256SUMS

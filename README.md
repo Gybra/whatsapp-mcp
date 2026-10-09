@@ -1,183 +1,137 @@
-# WhatsApp MCP Server
+# whatsapp-mcp
 
-This is a Model Context Protocol (MCP) server for WhatsApp.
+Read and search your WhatsApp conversations from an AI coding agent, and send messages only after you approve each one.
 
-With this you can search and read your personal Whatsapp messages (including images, videos, documents, and audio messages), search your contacts and send messages to either individuals or groups. You can also send media files including images, videos, documents, and audio messages.
+whatsapp-mcp is a small program, the *bridge*, that links to your WhatsApp account as a linked device, like WhatsApp Web. It keeps your message history on your computer and serves it to AI agents through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). It is built for [Pi](https://pi.dev) together with the [pi-whatsapp](https://github.com/Gybra/pi-whatsapp) extension, which lets you review every outgoing message inside Pi.
 
-It connects to your **personal WhatsApp account** directly via the Whatsapp web multidevice API (using the [whatsmeow](https://github.com/tulir/whatsmeow) library). All your messages are stored locally in a SQLite database and only sent to an LLM (such as Claude) when the agent accesses them through tools (which you control).
+> **Unofficial.** This project is not affiliated with, endorsed by or supported by WhatsApp or Meta. It uses [whatsmeow](https://github.com/tulir/whatsmeow), an unofficial implementation of the WhatsApp multi-device protocol. WhatsApp may restrict or ban accounts that use unofficial clients. Use it at your own risk.
 
-Here's an example of what you can do when it's connected to Claude.
+## Platform support
 
-![WhatsApp MCP](./example-use.png)
+| Platform | Status |
+|---|---|
+| macOS (Apple Silicon) | Automated tests pass. End-to-end verification with a real account is in progress. |
+| macOS (Intel) | Built in CI, not tested yet. |
+| Linux (x86-64, ARM64) | Developed and built for it, automated tests run in CI. Not yet tested end to end. |
+| Windows (x86-64) | **Experimental.** Developed for it, but not yet tested end to end. |
 
-> To get updates on this and other projects I work on [enter your email here](https://docs.google.com/forms/d/1rTF9wMBTN0vPfzWuQa2BjfGKdKIpTbyeKxhPMcEzgyI/preview)
+If you try it on Linux or Windows, please [open an issue](https://github.com/Gybra/whatsapp-mcp/issues/new/choose) with what worked and what did not.
 
-> *Caution:* as with many MCP servers, the WhatsApp MCP is subject to [the lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). This means that project injection could lead to private data exfiltration.
+## What it does
 
-## Installation
+- **Read:** search contacts, list chats and messages with filters, get the messages around a message, and download received files, including voice messages, to a private folder.
+- **Send:** text messages, files and voice messages, each only after a human approves that exact message.
+- **Run in the background:** optionally start at login, reconnect after network outages, and stop cleanly.
 
-### Prerequisites
+No agent can send on its own: the bridge refuses any message without a valid approval, whichever program asks.
 
-- Go
-- Python 3.6+
-- Anthropic Claude Desktop app (or Cursor)
-- UV (Python package manager), install with `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- FFmpeg (_optional_) - Only needed for audio messages. If you want to send audio files as playable WhatsApp voice messages, they must be in `.ogg` Opus format. With FFmpeg installed, the MCP server will automatically convert non-Opus audio files. Without FFmpeg, you can still send raw audio files using the `send_file` tool.
+## How it differs from the original
 
-### Steps
+This is a fork of [lharries/whatsapp-mcp](https://github.com/lharries/whatsapp-mcp), reworked for supervised use:
 
-1. **Clone this repository**
+- **Approval for every outgoing message.** The bridge sends only a message that an approver, the pi-whatsapp extension, signed after showing it to you. The approval covers the exact recipient, text and file bytes. It is single use and expires after 120 seconds. See [docs/approval-protocol-v1.md](docs/approval-protocol-v1.md).
+- **Locked-down local API.** The original API listened on every network interface with no authentication. This one listens only on `127.0.0.1`, requires a random token for every request, and rejects requests from web browsers.
+- **Confined files.** Files can only be sent from a dedicated `outbox` folder, never from an arbitrary path. Downloaded files get generated names, so a sender cannot write outside the download folder. Obvious credential files and private keys are refused.
+- **Private data and quiet logs.** Data lives in your user data directory with owner-only permissions. Logs contain no message contents, phone numbers or keys.
+- **One Go program.** The Python MCP server is gone. The bridge and the MCP server are the same executable, with no C compiler or Python needed.
+- **Setup and lifecycle commands,** and correct handling of WhatsApp's newer contact identifiers (LIDs).
 
-   ```bash
-   git clone https://github.com/lharries/whatsapp-mcp.git
-   cd whatsapp-mcp
-   ```
+## Install
 
-2. **Run the WhatsApp bridge**
+**With Pi (recommended):** install the extension and run `/whatsapp-setup` in Pi. It downloads the bridge, checks its checksum, shows the QR code to link your phone and asks whether to start the bridge at login. See [pi-whatsapp](https://github.com/Gybra/pi-whatsapp).
 
-   Navigate to the whatsapp-bridge directory and run the Go application:
+**Manually:** download the file for your system from [Releases](https://github.com/Gybra/whatsapp-mcp/releases), for example `whatsapp-mcp-darwin-arm64`, and check it against `SHA256SUMS`:
 
-   ```bash
-   cd whatsapp-bridge
-   go run main.go
-   ```
+```sh
+shasum -a 256 -c SHA256SUMS --ignore-missing     # macOS
+sha256sum -c SHA256SUMS --ignore-missing         # Linux
+gh attestation verify whatsapp-mcp-darwin-arm64 --repo Gybra/whatsapp-mcp   # optional: check it was built by this repository's CI
+```
 
-   The first time you run it, you will be prompted to scan a QR code. Scan the QR code with your WhatsApp mobile app to authenticate.
+Then make it executable (`chmod +x`), put it somewhere permanent, such as `~/.local/bin/whatsapp-mcp`, and run `whatsapp-mcp setup`. The binaries are not signed by Apple: on macOS, a file downloaded with a browser is blocked by Gatekeeper until you run `xattr -d com.apple.quarantine ~/.local/bin/whatsapp-mcp`. The Pi extension's download is not affected.
 
-   After approximately 20 days, you will might need to re-authenticate.
+**From source:** with Go 1.27 or later:
 
-3. **Connect to the MCP server**
+```sh
+cd whatsapp-bridge
+go build -o whatsapp-mcp .
+```
 
-   Copy the below json with the appropriate {{PATH}} values:
+## Link WhatsApp
 
-   ```json
-   {
-     "mcpServers": {
-       "whatsapp": {
-         "command": "{{PATH_TO_UV}}", // Run `which uv` and place the output here
-         "args": [
-           "--directory",
-           "{{PATH_TO_SRC}}/whatsapp-mcp/whatsapp-mcp-server", // cd into the repo, run `pwd` and enter the output here + "/whatsapp-mcp-server"
-           "run",
-           "main.py"
-         ]
-       }
-     }
-   }
-   ```
+`whatsapp-mcp setup` (or `/whatsapp-setup` in Pi) shows a QR code. On your phone, open WhatsApp › Settings › Linked devices › Link a device and scan it. The link stays valid until you remove it on your phone. WhatsApp may also unlink a device that stays offline for a long time; the bridge then reports that you need to link again and never deletes data on its own.
 
-   For **Claude**, save this as `claude_desktop_config.json` in your Claude Desktop configuration directory at:
+Some accounts ask you to confirm a code during linking: compare it with your phone and confirm. Accounts that require a passkey to link devices are not supported yet.
 
-   ```
-   ~/Library/Application Support/Claude/claude_desktop_config.json
-   ```
+## Commands
 
-   For **Cursor**, save this as `mcp.json` in your Cursor configuration directory at:
+```
+whatsapp-mcp setup               Link WhatsApp and choose autostart (interactive)
+whatsapp-mcp status [--json]     Is the bridge running, is WhatsApp linked
+whatsapp-mcp start | stop | restart
+whatsapp-mcp logs [-n LINES]
+whatsapp-mcp autostart enable|disable
+whatsapp-mcp uninstall [--purge]
+whatsapp-mcp mcp                 MCP server over stdio, for MCP clients
+```
 
-   ```
-   ~/.cursor/mcp.json
-   ```
+## Autostart
 
-4. **Restart Claude Desktop / Cursor**
+Autostart is optional and off unless you turn it on. It uses your system's per-user service manager and never needs administrator rights:
 
-   Open Claude Desktop and you should now see WhatsApp as an available integration.
+- **macOS:** a LaunchAgent in `~/Library/LaunchAgents/io.github.gybra.whatsapp-mcp.plist`.
+- **Linux:** a systemd user unit, `~/.config/systemd/user/whatsapp-mcp.service`. It runs while you are logged in. To keep it running after you log out, enable lingering yourself with `loginctl enable-linger`. Without systemd, run `whatsapp-mcp start` after logging in.
+- **Windows:** a Task Scheduler task named `whatsapp-mcp` that starts at logon.
 
-   Or restart Cursor.
+After a crash the service manager restarts the bridge, with a delay to avoid restart loops. `whatsapp-mcp stop` stops it until the next login or `start`. `whatsapp-mcp autostart disable` removes the service.
 
-### Windows Compatibility
+## Use with MCP clients
 
-If you're running this project on Windows, be aware that `go-sqlite3` requires **CGO to be enabled** in order to compile and work properly. By default, **CGO is disabled on Windows**, so you need to explicitly enable it and have a C compiler installed.
+The MCP server runs on demand: the client starts `whatsapp-mcp mcp` and talks to it over stdio, while the bridge keeps running in the background.
 
-#### Steps to get it working:
+**Pi:** handled by pi-whatsapp. **Other clients:** for example in `mcp.json`:
 
-1. **Install a C compiler**  
-   We recommend using [MSYS2](https://www.msys2.org/) to install a C compiler for Windows. After installing MSYS2, make sure to add the `ucrt64\bin` folder to your `PATH`.  
-   → A step-by-step guide is available [here](https://code.visualstudio.com/docs/cpp/config-mingw).
+```json
+{ "mcpServers": { "whatsapp": { "command": "/absolute/path/to/whatsapp-mcp", "args": ["mcp"] } } }
+```
 
-2. **Enable CGO and run the app**
+Without the pi-whatsapp extension, other clients can read and search, but every send is refused because nothing can approve it.
 
-   ```bash
-   cd whatsapp-bridge
-   go env -w CGO_ENABLED=1
-   go run main.go
-   ```
+To send a file, copy it into the `outbox` folder inside the data directory first, then ask the agent to send it by file name:
 
-Without this setup, you'll likely run into errors like:
+| OS | Data directory |
+|---|---|
+| macOS | `~/Library/Application Support/whatsapp-mcp` |
+| Linux | `$XDG_DATA_HOME/whatsapp-mcp`, by default `~/.local/share/whatsapp-mcp` |
+| Windows | `%LOCALAPPDATA%\whatsapp-mcp` |
 
-> `Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work.`
+## Your data
 
-## Architecture Overview
+The data directory holds the WhatsApp session (`whatsapp.db`, the keys of the linked device), the message history (`messages.db`), the local API token, downloaded files and a log without message contents. Treat it like a password. Nothing is sent anywhere except to WhatsApp. Messages that an AI agent reads, however, become part of the agent's conversation with its model provider.
 
-This application consists of two main components:
+History and downloads are kept until you delete them. To back up, stop the bridge and copy the whole directory. Keep that copy as private as the original. Files are protected by permissions only, not encrypted. `whatsapp-mcp uninstall --purge` deletes the directory; also remove the device under Linked devices on your phone.
 
-1. **Go WhatsApp Bridge** (`whatsapp-bridge/`): A Go application that connects to WhatsApp's web API, handles authentication via QR code, and stores message history in SQLite. It serves as the bridge between WhatsApp and the MCP server.
+If you used the original whatsapp-mcp, `whatsapp-mcp import /path/to/whatsapp-bridge/store` copies its session and history; the originals are left untouched.
 
-2. **Python MCP Server** (`whatsapp-mcp-server/`): A Python server implementing the Model Context Protocol (MCP), which provides standardized tools for Claude to interact with WhatsApp data and send/receive messages.
+## Security
 
-### Data Storage
+Read [SECURITY.md](SECURITY.md) and the [threat model](docs/threat-model.md). In short:
 
-- All message history is stored in a SQLite database within the `whatsapp-bridge/store/` directory
-- The database maintains tables for chats and messages
-- Messages are indexed for efficient searching and retrieval
+- The approval check protects against the AI model and against other programs that use the local API. It cannot protect against a program running as your user that changes the bridge, its data or Pi itself.
+- WhatsApp messages are untrusted input. A message can contain instructions aimed at the AI (prompt injection). Approval ensures nothing is sent on the AI's word alone, but you still need to read what you approve.
 
-## Usage
-
-Once connected, you can interact with your WhatsApp contacts through Claude, leveraging Claude's AI capabilities in your WhatsApp conversations.
-
-### MCP Tools
-
-Claude can access the following tools to interact with WhatsApp:
-
-- **search_contacts**: Search for contacts by name or phone number
-- **list_messages**: Retrieve messages with optional filters and context
-- **list_chats**: List available chats with metadata
-- **get_chat**: Get information about a specific chat
-- **get_direct_chat_by_contact**: Find a direct chat with a specific contact
-- **get_contact_chats**: List all chats involving a specific contact
-- **get_last_interaction**: Get the most recent message with a contact
-- **get_message_context**: Retrieve context around a specific message
-- **send_message**: Send a WhatsApp message to a specified phone number or group JID
-- **send_file**: Send a file (image, video, raw audio, document) to a specified recipient
-- **send_audio_message**: Send an audio file as a WhatsApp voice message (requires the file to be an .ogg opus file or ffmpeg must be installed)
-- **download_media**: Download media from a WhatsApp message and get the local file path
-
-### Media Handling Features
-
-The MCP server supports both sending and receiving various media types:
-
-#### Media Sending
-
-You can send various media types to your WhatsApp contacts:
-
-- **Images, Videos, Documents**: Use the `send_file` tool to share any supported media type.
-- **Voice Messages**: Use the `send_audio_message` tool to send audio files as playable WhatsApp voice messages.
-  - For optimal compatibility, audio files should be in `.ogg` Opus format.
-  - With FFmpeg installed, the system will automatically convert other audio formats (MP3, WAV, etc.) to the required format.
-  - Without FFmpeg, you can still send raw audio files using the `send_file` tool, but they won't appear as playable voice messages.
-
-#### Media Downloading
-
-By default, just the metadata of the media is stored in the local database. The message will indicate that media was sent. To access this media you need to use the download_media tool which takes the `message_id` and `chat_jid` (which are shown when printing messages containing the meda), this downloads the media and then returns the file path which can be then opened or passed to another tool.
-
-## Technical Details
-
-1. Claude sends requests to the Python MCP server
-2. The MCP server queries the Go bridge for WhatsApp data or directly to the SQLite database
-3. The Go accesses the WhatsApp API and keeps the SQLite database up to date
-4. Data flows back through the chain to Claude
-5. When sending messages, the request flows from Claude through the MCP server to the Go bridge and to WhatsApp
+Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 
-- If you encounter permission issues when running uv, you may need to add it to your PATH or use the full path to the executable.
-- Make sure both the Go application and the Python server are running for the integration to work properly.
+- **`whatsapp-mcp status` says not running:** run `whatsapp-mcp start`, then `whatsapp-mcp logs`.
+- **Port 8080 already in use:** another program, or a bridge from the original project, uses it. Stop it and start again.
+- **Needs action / logged out:** WhatsApp ended the session or another client replaced it. Run `whatsapp-mcp setup` to link again.
+- **Sending says the session is not paired:** in Pi, confirm the pairing question or run `/whatsapp-pair`.
+- **Messages missing after linking:** WhatsApp sends history in batches. Leave the bridge running for a while.
 
-### Authentication Issues
+## License
 
-- **QR Code Not Displaying**: If the QR code doesn't appear, try restarting the authentication script. If issues persist, check if your terminal supports displaying QR codes.
-- **WhatsApp Already Logged In**: If your session is already active, the Go bridge will automatically reconnect without showing a QR code.
-- **Device Limit Reached**: WhatsApp limits the number of linked devices. If you reach this limit, you'll need to remove an existing device from WhatsApp on your phone (Settings > Linked Devices).
-- **No Messages Loading**: After initial authentication, it can take several minutes for your message history to load, especially if you have many chats.
-- **WhatsApp Out of Sync**: If your WhatsApp messages get out of sync with the bridge, delete both database files (`whatsapp-bridge/store/messages.db` and `whatsapp-bridge/store/whatsapp.db`) and restart the bridge to re-authenticate.
+The source code is MIT licensed; see [LICENSE](LICENSE). The release binaries include GPL-3.0 and MPL-2.0 libraries, so they are distributed under the terms of the GPL-3.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-For additional Claude Desktop integration troubleshooting, see the [MCP documentation](https://modelcontextprotocol.io/quickstart/server#claude-for-desktop-integration-issues). The documentation includes helpful tips for checking logs and resolving common issues.
+Based on [whatsapp-mcp](https://github.com/lharries/whatsapp-mcp) by Luke Harries.

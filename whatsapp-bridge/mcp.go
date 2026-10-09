@@ -7,7 +7,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const version = "0.1.0-dev"
+// version is set at release time with -ldflags "-X main.version=..."
+var version = "0.1.0-dev"
 
 const serverInstructions = `Read, search and send the user's WhatsApp messages.
 

@@ -32,7 +32,7 @@ func (dryRunSender) Send(_ context.Context, draft FrozenDraft) (SendReceipt, err
 //	go test -tags manual -run TestManualDryRunBridge -timeout 0 -v .
 //
 // It uses the real data directory for the API token, the approver pairing and the
-// outbox, so the Pi extension and `whatsapp-mcp setup --pair-pi` work unchanged.
+// outbox, so the Pi extension and `whatsapp-mcp pair-pi` work unchanged.
 // Stop it with Ctrl-C.
 func TestManualDryRunBridge(t *testing.T) {
 	dataDir, err := defaultDataDir()

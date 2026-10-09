@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # Windows support is experimental until it has been verified end to end.
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    defaults:
+      run:
+        working-directory: whatsapp-bridge
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache-dependency-path: whatsapp-bridge/go.sum
+      - name: Formatting
+        run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - name: Tests
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then go test -count=1 ./...; else go test -race -count=1 ./...; fi
+      - run: go mod verify
+
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: whatsapp-bridge
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache-dependency-path: whatsapp-bridge/go.sum
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: whatsapp-bridge
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          cache-dependency-path: whatsapp-bridge/go.sum
+      - name: Build every release target
+        run: |
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            CGO_ENABLED=0 GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -o /dev/null .
+          done

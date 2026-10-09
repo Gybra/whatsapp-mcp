@@ -2,13 +2,11 @@
 
 Every outgoing WhatsApp operation (text, file or voice message) is sent only after a human approves that exact operation. The bridge enforces this: it refuses to send without a valid proof, whichever client calls it. This document describes the wire format shared by the bridge and an approver such as the [`pi-whatsapp`](https://github.com/Gybra/pi-whatsapp) Pi extension.
 
-Status: the approval core is implemented and tested without a WhatsApp connection. Sending remains disabled until the enrollment flow, the HTTP API and the reviewer UI pass their own tests.
-
 ## Roles
 
 - **Bridge**: owns the WhatsApp session. It validates and freezes each proposed operation, and verifies the approval before sending.
 - **Approver**: an interactive component holding an Ed25519 key pair for one session. It shows the user the frozen operation and signs it only after a direct confirmation.
-- **Enrollment**: the user authorizes the approver's public key from a local terminal with `whatsapp-mcp setup --pair-pi`. The bridge stores only the public key. The pairing has no expiry: the private key lives only in the approver process, which revokes the pairing when it exits; after a crash the stored public key is useless and the next pairing replaces it. There is no API route to enroll a key: the API bearer token cannot create or replace the approver.
+- **Enrollment**: after the user agrees in Pi, the extension passes its public key to `whatsapp-mcp pair-pi` on standard input. The bridge stores only the public key, replacing any earlier one. The pairing has no expiry: the private key lives only in the approver process, which revokes the pairing when it exits. After a crash the stored public key is useless, and the next pairing replaces it. There is no API route to enroll a key, so the API bearer token cannot create or replace the approver. The extension also blocks the model's file and shell tools from running `pair-pi` or touching the bridge's data.
 
 ## Flow
 

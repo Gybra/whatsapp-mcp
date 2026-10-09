@@ -222,6 +222,17 @@ func (m *ApprovalManager) TrustedApprover() (string, int64, error) {
 	return approverID(publicKey), expiresAt, nil
 }
 
+// ReadFrozenPreview returns a copy of the exact attachment bytes of a pending draft, for review.
+func (m *ApprovalManager) ReadFrozenPreview(draftID string) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	g := m.grants[draftID]
+	if g == nil || g.used || g.draft.Payload.Attachment == nil || !m.now().Before(g.expiresAt) {
+		return nil, ErrNotFound
+	}
+	return append([]byte(nil), g.draft.Media...), nil
+}
+
 func (m *ApprovalManager) Cancel(draftID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

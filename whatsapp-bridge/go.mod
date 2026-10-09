@@ -7,7 +7,6 @@ require (
 	go.mau.fi/whatsmeow v0.0.0-20250318233852-06705625cf82
 	golang.org/x/sys v0.49.0
 	golang.org/x/term v0.46.0
-	google.golang.org/protobuf v1.36.5
 )
 
 require (
@@ -21,4 +20,5 @@ require (
 	go.mau.fi/util v0.8.6 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 )

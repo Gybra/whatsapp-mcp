@@ -1,3 +1,17 @@
+# WhatsApp session, message history, media, credentials and logs: never commit.
+store/
 *.db
+*.db-*
+*.log
+api-token
+approver.json
+outbox/
+media/
+.env
+.env.*
 claude_desktop_config.json
-whatsapp.log
+
+# Build output
+/whatsapp-bridge/whatsapp-client
+/whatsapp-bridge/whatsapp-mcp
+/dist/

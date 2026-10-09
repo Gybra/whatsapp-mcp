@@ -16,7 +16,7 @@ whatsapp-mcp is a small program, the *bridge*, that links to your WhatsApp accou
 | Linux (ARM64) | Built and tested in CI, not yet tested end to end. |
 | Windows (x86-64) | **Experimental.** Developed for it, but not yet tested end to end. |
 
-If you try it on Linux or Windows, please [open an issue](https://github.com/Gybra/whatsapp-mcp/issues/new/choose) with what worked and what did not.
+If you try it on Windows, Linux ARM64 or an Intel Mac, please [open an issue](https://github.com/Gybra/whatsapp-mcp/issues/new/choose) with what worked and what did not.
 
 ## What it does
 

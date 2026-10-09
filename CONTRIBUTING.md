@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. Bug reports from Linux and Windows are especially welcome, since those platforms are not yet tested end to end.
+Thanks for helping. Bug reports from Windows, Linux ARM64 and Intel Macs are especially welcome, since those platforms are not yet tested end to end.
 
 ## Reporting a problem
 

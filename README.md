@@ -12,7 +12,8 @@ whatsapp-mcp is a small program, the *bridge*, that links to your WhatsApp accou
 |---|---|
 | macOS (Apple Silicon) | **Tested** with a real account: QR linking, reading chats, approved text messages, downloading voice messages, autostart. |
 | macOS (Intel) | Built in CI, not tested yet. |
-| Linux (x86-64, ARM64) | Developed and built for it, automated tests run in CI. Not yet tested end to end. |
+| Linux (x86-64) | **Tested** on Omarchy (Arch Linux) with a real account: setup from Pi, QR linking, reading chats, approved messages, voice messages, autostart across reboots. |
+| Linux (ARM64) | Built and tested in CI, not yet tested end to end. |
 | Windows (x86-64) | **Experimental.** Developed for it, but not yet tested end to end. |
 
 If you try it on Linux or Windows, please [open an issue](https://github.com/Gybra/whatsapp-mcp/issues/new/choose) with what worked and what did not.

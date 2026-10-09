@@ -220,7 +220,11 @@ func (c *CLI) mcp(ctx context.Context) error {
 	if err != nil {
 		return errors.New("the WhatsApp bridge is not set up: run whatsapp-mcp setup first")
 	}
-	return RunMCP(ctx, NewBridgeClient(token))
+	// The model is told to copy files to send into the outbox, so it must exist.
+	if err := EnsurePrivateDir(filepath.Join(c.DataDir, outboxName)); err != nil {
+		return err
+	}
+	return RunMCP(ctx, NewBridgeClient(token), c.DataDir)
 }
 
 func (c *CLI) running(ctx context.Context) (APIStatus, bool) {

@@ -11,7 +11,7 @@
 
 | Actor | Can | Protection |
 |---|---|---|
-| The AI model, manipulated by a message or document | Call the MCP tools, run Pi's file and shell tools | Sends need your approval in Pi; the pi-whatsapp extension blocks its file and shell tools from the bridge's data and pairing command. |
+| The AI model, manipulated by a message or document | Call the MCP tools, run Pi's file and shell tools | Sends need your approval in Pi; the pi-whatsapp extension blocks its file and shell tools from the bridge's data and pairing command, except the outbox and downloads folders. |
 | Another local program using the API | Send HTTP requests to `127.0.0.1:8080` | Token on every request; sends still need a signed approval; no API route can create an approver. |
 | A web page you visit | Send requests to localhost | Requests with an `Origin` or a host other than `127.0.0.1:8080` are rejected (also DNS rebinding). |
 | Someone on your network | Connect to your computer | The API listens only on loopback. |

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ func TestMain(m *testing.M) {
 		token, _ := hex.DecodeString(os.Getenv("WHATSAPP_MCP_TEST_TOKEN"))
 		client := NewBridgeClient(token)
 		client.baseURL = url
-		if err := RunMCP(context.Background(), client); err != nil {
+		if err := RunMCP(context.Background(), client, os.TempDir()); err != nil {
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -64,7 +65,7 @@ func newMCPTest(t *testing.T) *mcpTest {
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	ctx := context.Background()
-	if _, err := NewMCPServer(client).Connect(ctx, serverTransport, nil); err != nil {
+	if _, err := NewMCPServer(client, "/data dir").Connect(ctx, serverTransport, nil); err != nil {
 		t.Fatal(err)
 	}
 	session, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, clientTransport, nil)
@@ -136,6 +137,16 @@ func TestMCPToolsDiscovery(t *testing.T) {
 	}
 	if s := schema("send_message"); !strings.Contains(s, `"required":["recipient","message"]`) || !strings.Contains(s, `"approval"`) {
 		t.Errorf("send_message schema: %s", s)
+	}
+}
+
+func TestMCPInstructionsNameTheFolders(t *testing.T) {
+	m := newMCPTest(t)
+	instructions := m.session.InitializeResult().Instructions
+	for _, want := range []string{filepath.Join("/data dir", "outbox"), filepath.Join("/data dir", "downloads"), "untrusted"} {
+		if !strings.Contains(instructions, want) {
+			t.Errorf("instructions lack %q:\n%s", want, instructions)
+		}
 	}
 }
 

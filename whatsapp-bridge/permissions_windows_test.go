@@ -10,8 +10,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// assertPrivate checks for a protected DACL whose entries all allow only the current user.
-// Directories get two entries for that user: one for the directory and one inherited by its contents.
+// assertPrivate checks that every DACL entry allows only the current user. Directories must also
+// block inheritance from their parent; files such as SQLite sidecars inherit from that private directory.
+// Directories get two entries for the user: one for the directory and one inherited by its contents.
 func assertPrivate(t *testing.T, path string, dir bool) {
 	t.Helper()
 	info, err := os.Lstat(path)
@@ -27,7 +28,7 @@ func assertPrivate(t *testing.T, path string, dir bool) {
 		t.Fatal(err)
 	}
 	control, _, err := sd.Control()
-	if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
+	if err != nil || dir && control&windows.SE_DACL_PROTECTED == 0 {
 		t.Fatalf("%s: DACL %s inherits from its parent (%v)", path, sd, err)
 	}
 	dacl, _, err := sd.DACL()

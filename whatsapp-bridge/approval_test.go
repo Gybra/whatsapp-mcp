@@ -36,7 +36,7 @@ func newApprovalHarness(t *testing.T) *approvalHarness {
 	t.Helper()
 	seed, _ := hex.DecodeString(testSeedHex)
 	h := &approvalHarness{now: time.Unix(1_800_000_000, 0), key: ed25519.NewKeyFromSeed(seed), leaseOK: true}
-	h.lease = &ApproverLease{PublicKeyB64: publicKeyB64(h.key), ExpiresAt: h.now.Unix() + 3600}
+	h.lease = &ApproverLease{PublicKeyB64: publicKeyB64(h.key)}
 	h.manager = NewApprovalManager(h.clock, rand.Reader, h.lookup)
 	return h
 }
@@ -262,7 +262,6 @@ func TestApprovalRevocation(t *testing.T) {
 		"revoke":        func(h *approvalHarness, _ DraftView) { h.manager.Revoke() },
 		"close":         func(h *approvalHarness, _ DraftView) { h.manager.Close() },
 		"lease removed": func(h *approvalHarness, _ DraftView) { h.leaseOK = false },
-		"lease expired": func(h *approvalHarness, _ DraftView) { h.lease.ExpiresAt = h.now.Unix() },
 		"lease replaced": func(h *approvalHarness, _ DraftView) {
 			_, other, _ := ed25519.GenerateKey(rand.Reader)
 			h.lease.PublicKeyB64 = publicKeyB64(other)
@@ -297,14 +296,19 @@ func TestApprovalRevocation(t *testing.T) {
 	})
 	t.Run("trusted approver identity", func(t *testing.T) {
 		h := newApprovalHarness(t)
-		id, expires, err := h.manager.TrustedApprover()
+		id, err := h.manager.TrustedApprover()
 		pub := sha256.Sum256(h.key.Public().(ed25519.PublicKey))
-		if err != nil || id != hex.EncodeToString(pub[:]) || expires != h.lease.ExpiresAt {
-			t.Fatalf("TrustedApprover = %q, %d, %v", id, expires, err)
+		if err != nil || id != hex.EncodeToString(pub[:]) {
+			t.Fatalf("TrustedApprover = %q, %v", id, err)
+		}
+		// No expiry: a pairing lasts until it is revoked or replaced.
+		h.advance(365 * 24 * time.Hour)
+		if _, err := h.manager.TrustedApprover(); err != nil {
+			t.Fatalf("pairing expired: %v", err)
 		}
 		for _, bad := range []string{"", "%%%", base64.StdEncoding.EncodeToString(make([]byte, 31))} {
 			h.lease.PublicKeyB64 = bad
-			if _, _, err := h.manager.TrustedApprover(); !errors.Is(err, ErrNotPaired) {
+			if _, err := h.manager.TrustedApprover(); !errors.Is(err, ErrNotPaired) {
 				t.Fatalf("malformed lease %q: got %v, want ErrNotPaired", bad, err)
 			}
 		}

@@ -85,9 +85,10 @@ type ApprovalProof struct {
 }
 
 // ApproverLease is the public half of the approver enrolled through the trusted console.
+// It has no expiry: the private half lives only in the approver's process, and the
+// approver revokes the lease when it exits. A newer pairing replaces it.
 type ApproverLease struct {
 	PublicKeyB64 string `json:"public_key_b64"`
-	ExpiresAt    int64  `json:"expires_at"`
 }
 
 type ApproverLookup func() (ApproverLease, error)
@@ -134,7 +135,7 @@ func (m *ApprovalManager) Prepare(draft FrozenDraft) (DraftView, error) {
 		return DraftView{}, err
 	}
 	now := m.now()
-	publicKey, _, err := m.trustedKey(now)
+	publicKey, err := m.trustedKey()
 	if err != nil {
 		return DraftView{}, err
 	}
@@ -193,7 +194,7 @@ func (m *ApprovalManager) Consume(input SendInput, proof ApprovalProof) (FrozenD
 		delete(m.grants, proof.DraftID)
 		return FrozenDraft{}, ErrApprovalExpired
 	}
-	publicKey, _, err := m.trustedKey(now)
+	publicKey, err := m.trustedKey()
 	if err != nil {
 		return FrozenDraft{}, err
 	}
@@ -212,14 +213,14 @@ func (m *ApprovalManager) Consume(input SendInput, proof ApprovalProof) (FrozenD
 }
 
 // TrustedApprover reports the enrolled approver's fingerprint, never key material.
-func (m *ApprovalManager) TrustedApprover() (string, int64, error) {
+func (m *ApprovalManager) TrustedApprover() (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	publicKey, expiresAt, err := m.trustedKey(m.now())
+	publicKey, err := m.trustedKey()
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
-	return approverID(publicKey), expiresAt, nil
+	return approverID(publicKey), nil
 }
 
 // ReadFrozenPreview returns a copy of the exact attachment bytes of a pending draft, for review.
@@ -253,16 +254,16 @@ func (m *ApprovalManager) Close() {
 	clear(m.grants)
 }
 
-func (m *ApprovalManager) trustedKey(now time.Time) (ed25519.PublicKey, int64, error) {
+func (m *ApprovalManager) trustedKey() (ed25519.PublicKey, error) {
 	lease, err := m.lookup()
 	if err != nil {
-		return nil, 0, ErrNotPaired
+		return nil, ErrNotPaired
 	}
 	key, ok := decodeCanonicalB64(lease.PublicKeyB64)
-	if !ok || len(key) != ed25519.PublicKeySize || lease.ExpiresAt <= now.Unix() {
-		return nil, 0, ErrNotPaired
+	if !ok || len(key) != ed25519.PublicKeySize {
+		return nil, ErrNotPaired
 	}
-	return ed25519.PublicKey(key), lease.ExpiresAt, nil
+	return ed25519.PublicKey(key), nil
 }
 
 func (m *ApprovalManager) prune(now time.Time) {

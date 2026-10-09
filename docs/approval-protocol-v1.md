@@ -8,7 +8,7 @@ Status: the approval core is implemented and tested without a WhatsApp connectio
 
 - **Bridge**: owns the WhatsApp session. It validates and freezes each proposed operation, and verifies the approval before sending.
 - **Approver**: an interactive component holding an Ed25519 key pair for one session. It shows the user the frozen operation and signs it only after a direct confirmation.
-- **Enrollment**: the user authorizes the approver's public key from a local terminal with `whatsapp-mcp setup --pair-pi`. The bridge stores only the public key, as a lease that expires after at most 8 hours. There is no API route to enroll a key: the API bearer token cannot create or replace the approver.
+- **Enrollment**: the user authorizes the approver's public key from a local terminal with `whatsapp-mcp setup --pair-pi`. The bridge stores only the public key. The pairing has no expiry: the private key lives only in the approver process, which revokes the pairing when it exits; after a crash the stored public key is useless and the next pairing replaces it. There is no API route to enroll a key: the API bearer token cannot create or replace the approver.
 
 ## Flow
 
@@ -64,7 +64,7 @@ challenge = ASCII("whatsapp-mcp/approval/v1") || 0x00
 - A draft expires 120 seconds after creation. A proof presented at or after `expires_at` is rejected.
 - A proof is accepted once. A valid signature is spent even if the accompanying input differs from the frozen one, so it cannot be replayed with corrected arguments. A retry after a failed or uncertain send needs a new approval.
 - A proof is bound to its draft, its nonce and the enrolled key. A signature for one draft does not authorize another one, even with identical content.
-- Replacing, removing or letting the approver lease expire invalidates pending drafts. So do revocation and bridge shutdown.
+- Replacing or removing the approver invalidates pending drafts. So do revocation and bridge shutdown.
 - At most 32 drafts can wait for approval at once.
 - Drafts are kept in memory only.
 

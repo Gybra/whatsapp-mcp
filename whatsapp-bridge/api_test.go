@@ -316,7 +316,7 @@ func TestNoEnrollmentAPI(t *testing.T) {
 	}
 	var status APIStatus
 	json.Unmarshal(a.request("GET", "/api/status", "").Body.Bytes(), &status)
-	if status.ApproverID != "" || status.ApproverExpiresAt != 0 {
+	if status.ApproverID != "" {
 		t.Fatalf("approver still trusted after revoke: %+v", status)
 	}
 	a.leaseOK = true // the same key is paired again
@@ -331,8 +331,8 @@ func TestAPIStatus(t *testing.T) {
 	var status APIStatus
 	rec := a.request("GET", "/api/status", "")
 	json.Unmarshal(rec.Body.Bytes(), &status)
-	id, expires, _ := a.manager.TrustedApprover()
-	if rec.Code != http.StatusOK || status.State != "offline" || status.Connected || status.ApproverID != id || status.ApproverExpiresAt != expires {
+	id, _ := a.manager.TrustedApprover()
+	if rec.Code != http.StatusOK || status.State != "offline" || status.Connected || status.ApproverID != id || strings.Contains(rec.Body.String(), "expires") {
 		t.Fatalf("status: %d %+v", rec.Code, status)
 	}
 	if rec.Header().Get("Cache-Control") != "no-store" {

@@ -40,10 +40,9 @@ type RuntimeStatus struct {
 }
 
 type APIStatus struct {
-	State             string `json:"state"`
-	Connected         bool   `json:"connected"`
-	ApproverID        string `json:"approver_id"`
-	ApproverExpiresAt int64  `json:"approver_expires_at"`
+	State      string `json:"state"`
+	Connected  bool   `json:"connected"`
+	ApproverID string `json:"approver_id"`
 }
 
 type APIConfig struct {
@@ -123,8 +122,8 @@ func (a *api) status(w http.ResponseWriter, r *http.Request) {
 		runtime = a.cfg.Status()
 	}
 	status := APIStatus{State: runtime.State, Connected: runtime.Connected}
-	if id, expiresAt, err := a.approvals.TrustedApprover(); err == nil {
-		status.ApproverID, status.ApproverExpiresAt = id, expiresAt
+	if id, err := a.approvals.TrustedApprover(); err == nil {
+		status.ApproverID = id
 	}
 	writeJSON(w, http.StatusOK, status)
 }

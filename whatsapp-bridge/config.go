@@ -18,16 +18,14 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 
 	"golang.org/x/term"
 )
 
 const (
-	appName           = "whatsapp-mcp"
-	tokenFile         = "api-token"
-	approverFile      = "approver.json"
-	approverLeaseTime = 8 * time.Hour
+	appName      = "whatsapp-mcp"
+	tokenFile    = "api-token"
+	approverFile = "approver.json"
 )
 
 var (
@@ -172,8 +170,8 @@ func LoadOrCreateToken(dataDir string, random io.Reader) ([]byte, error) {
 	return token, nil
 }
 
-// LoadApprover returns the enrolled approver's public lease, if it is well formed and current.
-func LoadApprover(dataDir string, now time.Time) (ApproverLease, error) {
+// LoadApprover returns the enrolled approver's public lease, if it is well formed.
+func LoadApprover(dataDir string) (ApproverLease, error) {
 	data, err := readPrivateFile(filepath.Join(dataDir, approverFile), 1024)
 	if err != nil {
 		return ApproverLease{}, fmt.Errorf("%w: %v", ErrNotPaired, err)
@@ -185,14 +183,15 @@ func LoadApprover(dataDir string, now time.Time) (ApproverLease, error) {
 		return ApproverLease{}, fmt.Errorf("%w: malformed approver lease", ErrNotPaired)
 	}
 	key, ok := decodeCanonicalB64(lease.PublicKeyB64)
-	if !ok || len(key) != ed25519.PublicKeySize || lease.ExpiresAt <= now.Unix() || lease.ExpiresAt > now.Add(approverLeaseTime).Unix() {
-		return ApproverLease{}, fmt.Errorf("%w: approver lease is invalid or expired", ErrNotPaired)
+	if !ok || len(key) != ed25519.PublicKeySize {
+		return ApproverLease{}, fmt.Errorf("%w: approver lease is invalid", ErrNotPaired)
 	}
 	return lease, nil
 }
 
-// PairApprover trusts publicKey to approve sends for approverLeaseTime, after the user confirms its fingerprint.
-func PairApprover(dataDir string, publicKey []byte, now time.Time, console TrustedConsole) error {
+// PairApprover trusts publicKey to approve sends after the user confirms its fingerprint.
+// It replaces any earlier pairing.
+func PairApprover(dataDir string, publicKey []byte, console TrustedConsole) error {
 	if !console.IsInteractive() {
 		return errNoTerminal
 	}
@@ -206,10 +205,7 @@ func PairApprover(dataDir string, publicKey []byte, now time.Time, console Trust
 	if !confirmed {
 		return errCancelled
 	}
-	lease, err := json.Marshal(ApproverLease{
-		PublicKeyB64: base64.StdEncoding.EncodeToString(publicKey),
-		ExpiresAt:    now.Add(approverLeaseTime).Unix(),
-	})
+	lease, err := json.Marshal(ApproverLease{PublicKeyB64: base64.StdEncoding.EncodeToString(publicKey)})
 	if err != nil {
 		return err
 	}
@@ -241,7 +237,7 @@ func RunPairingSetup(dataDir string, console TrustedConsole) error {
 	if err := EnsurePrivateDir(dataDir); err != nil {
 		return err
 	}
-	return PairApprover(dataDir, key, time.Now(), console)
+	return PairApprover(dataDir, key, console)
 }
 
 var legacyTables = map[string][]string{
@@ -374,7 +370,7 @@ func (c *terminalConsole) ReadPublicKey() (string, error) {
 }
 
 func (c *terminalConsole) ConfirmFingerprint(fingerprint string) (bool, error) {
-	fmt.Printf("\nApprover fingerprint:\n  %s\n\nCheck that Pi shows the same fingerprint. That Pi session will be able to approve\noutgoing WhatsApp messages for up to 8 hours.\nType \"yes\" to trust it: ", fingerprint)
+	fmt.Printf("\nApprover fingerprint:\n  %s\n\nCheck that Pi shows the same fingerprint. That Pi session will be able to approve\noutgoing WhatsApp messages until Pi quits or reloads.\nType \"yes\" to trust it: ", fingerprint)
 	answer, err := c.readLine()
 	return answer == "yes", err
 }

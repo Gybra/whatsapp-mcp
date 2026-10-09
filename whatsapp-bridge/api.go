@@ -190,8 +190,8 @@ func (a *api) send(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	receipt, err := a.sender.Send(ctx, draft)
 	if err != nil {
-		if !errors.Is(err, ErrClosed) {
-			err = ErrSendUncertain
+		if !errors.Is(err, ErrClosed) && !errors.Is(err, ErrSendFailed) {
+			err = ErrSendUncertain // an error after sending started cannot prove nothing arrived
 		}
 		writeError(w, err)
 		return
@@ -318,6 +318,7 @@ var errorStatus = []struct {
 	{ErrBusy, http.StatusTooManyRequests},
 	{ErrClosed, http.StatusServiceUnavailable},
 	{ErrSendUncertain, http.StatusBadGateway},
+	{ErrSendFailed, http.StatusBadGateway},
 }
 
 // writeError replies with a fixed error code; underlying error details never reach the client.

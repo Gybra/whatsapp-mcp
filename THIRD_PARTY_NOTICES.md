@@ -1,0 +1,36 @@
+# Third-party notices
+
+This project's own source code, and the upstream [lharries/whatsapp-mcp](https://github.com/lharries/whatsapp-mcp) code it is derived from, are licensed under the MIT License (see [LICENSE](LICENSE)).
+
+A compiled `whatsapp-mcp` executable also contains the Go modules listed below, each under its own license. **The executable as a whole is therefore not MIT-only.** In particular, `go.mau.fi/libsignal` is licensed under the GPL-3.0, and `whatsmeow` and `go.mau.fi/util` under the MPL-2.0. Anyone distributing binaries must meet those licenses' terms, including making the corresponding source code available. This section is an inventory, not legal advice. Binary releases of this project are on hold until the distribution approach has been reviewed.
+
+Modules compiled into the bridge (from `go list -deps`, with each license identified from the module's own license file):
+
+| Module | Version | License |
+|---|---|---|
+| filippo.io/edwards25519 | v1.2.0 | BSD-3-Clause |
+| github.com/beeper/argo-go | v1.1.2 | MIT |
+| github.com/coder/websocket | v1.8.15 | ISC |
+| github.com/elliotchance/orderedmap/v3 | v3.1.0 | MIT |
+| github.com/google/uuid | v1.6.0 | BSD-3-Clause |
+| github.com/mattn/go-colorable | v0.1.14 | MIT |
+| github.com/mattn/go-isatty | v0.0.20 | MIT |
+| github.com/mattn/go-sqlite3 | v1.14.52 | MIT (bundles SQLite, which is in the public domain) |
+| github.com/petermattis/goid | v0.0.0-20260820044319-269ab09b5261 | Apache-2.0 |
+| github.com/rs/zerolog | v1.35.1 | MIT |
+| github.com/vektah/gqlparser/v2 | v2.5.27 | MIT |
+| go.mau.fi/libsignal | v0.2.2 | **GPL-3.0** |
+| go.mau.fi/util | v0.10.1 | MPL-2.0 |
+| go.mau.fi/whatsmeow | v0.0.0-20261007111105-c386243a72ba | MPL-2.0 |
+| golang.org/x/crypto | v0.57.0 | BSD-3-Clause |
+| golang.org/x/exp | v0.0.0-20260908205506-85c1c2202aba | BSD-3-Clause |
+| golang.org/x/net | v0.60.0 | BSD-3-Clause |
+| golang.org/x/sync | v0.23.0 | BSD-3-Clause |
+| golang.org/x/sys | v0.49.0 | BSD-3-Clause |
+| golang.org/x/term | v0.46.0 | BSD-3-Clause |
+| golang.org/x/text | v0.42.0 | BSD-3-Clause |
+| google.golang.org/protobuf | v1.36.12 | BSD-3-Clause |
+
+The Go standard library and runtime are licensed under the BSD-3-Clause license.
+
+Update this table whenever `whatsapp-bridge/go.mod` changes.

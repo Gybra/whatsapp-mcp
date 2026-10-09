@@ -296,8 +296,13 @@ func TestSendResponseLost(t *testing.T) {
 	if a.sender.ctxErr != nil || a.sender.budget <= 0 || a.sender.budget > 60*time.Second {
 		t.Fatalf("a client disconnect must not cancel a send in progress, and sends are bounded: ctx err %v, budget %v", a.sender.ctxErr, a.sender.budget)
 	}
+	a.sender.err = ErrSendFailed // definitely not sent, e.g. the upload failed
+	failedProof := signView(t, a.key, a.createDraft(t, textInput))
+	if rec := a.request("POST", "/api/send", sendBody(textInput, &failedProof)); errorCode(t, rec) != "send_failed" {
+		t.Fatalf("definite failure reported as %d %s", rec.Code, rec.Body)
+	}
 	a.sender.err = nil
-	if rec := a.request("POST", "/api/send", sendBody(textInput, &proof)); errorCode(t, rec) != "approval_used" || a.sender.calls.Load() != 1 {
+	if rec := a.request("POST", "/api/send", sendBody(textInput, &proof)); errorCode(t, rec) != "approval_used" || a.sender.calls.Load() != 2 {
 		t.Fatalf("retry after an uncertain send must need a new approval: %d %s", rec.Code, rec.Body)
 	}
 }

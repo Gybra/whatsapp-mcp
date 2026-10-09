@@ -234,6 +234,12 @@ func (store *MessageStore) StoreMessage(ctx context.Context, m StoredMessage) er
 	return err
 }
 
+func (store *MessageStore) chatName(ctx context.Context, jid string) (string, error) {
+	var name sql.NullString
+	err := store.db.QueryRowContext(ctx, `SELECT name FROM chats WHERE jid = ?`, jid).Scan(&name)
+	return name.String, err
+}
+
 func (store *MessageStore) GetMediaInfo(ctx context.Context, id, chatJID string) (MediaInfo, error) {
 	var info MediaInfo
 	var mediaType, filename, url, directPath sql.NullString

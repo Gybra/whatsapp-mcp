@@ -10,7 +10,7 @@ whatsapp-mcp is a small program, the *bridge*, that links to your WhatsApp accou
 
 | Platform | Status |
 |---|---|
-| macOS (Apple Silicon) | Automated tests pass. End-to-end verification with a real account is in progress. |
+| macOS (Apple Silicon) | **Tested** with a real account: QR linking, reading chats, approved text messages, downloading voice messages, autostart. |
 | macOS (Intel) | Built in CI, not tested yet. |
 | Linux (x86-64, ARM64) | Developed and built for it, automated tests run in CI. Not yet tested end to end. |
 | Windows (x86-64) | **Experimental.** Developed for it, but not yet tested end to end. |

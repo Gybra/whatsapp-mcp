@@ -42,4 +42,4 @@ Then in Pi, with the extension loaded (`pi -e /path/to/pi-whatsapp`):
 | Turn the network off for a minute and on again: the bridge reconnects | | | |
 | `whatsapp-mcp uninstall` removes autostart and keeps the data | | | |
 
-Mark a platform as tested in the README only after every row passes on it.
+Mark a platform as tested in the README only after it has been checked with a real account, and list there what was checked.

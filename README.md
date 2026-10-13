@@ -1,5 +1,7 @@
 # whatsapp-mcp
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/gybra-whatsapp-mcp-1u7q6p?v=b84cb7252861a5dfd03a93adf7f1ebd3)](https://m8ven.ai/mcp/gybra-whatsapp-mcp-1u7q6p?s=readme)
+
 Read and search your WhatsApp conversations from an AI coding agent, and send messages only after you approve each one.
 
 whatsapp-mcp is a small program, the *bridge*, that links to your WhatsApp account as a linked device, like WhatsApp Web. It keeps your message history on your computer and serves it to AI agents through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP). It is built for [Pi](https://pi.dev) together with the [pi-whatsapp](https://github.com/Gybra/pi-whatsapp) extension, which lets you review every outgoing message inside Pi.

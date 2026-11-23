@@ -45,6 +45,12 @@ type (
 		Message   string         `json:"message" jsonschema:"the exact text to send"`
 		Approval  *ApprovalProof `json:"approval,omitempty" jsonschema:"added by the Pi approval extension after the user approves; never set it yourself"`
 	}
+	SendPollInput struct {
+		Recipient string         `json:"recipient" jsonschema:"phone number with country code, digits only (e.g. 12025550123), or a chat JID"`
+		Question  string         `json:"question" jsonschema:"the poll question, at most 255 bytes"`
+		Options   []string       `json:"options" jsonschema:"2 to 12 answer options, each at most 100 bytes and all distinct"`
+		Approval  *ApprovalProof `json:"approval,omitempty" jsonschema:"added by the Pi approval extension after the user approves; never set it yourself"`
+	}
 	SendMediaInput struct {
 		Recipient string         `json:"recipient" jsonschema:"phone number with country code, digits only (e.g. 12025550123), or a chat JID"`
 		MediaID   string         `json:"media_id" jsonschema:"name of a file the user copied into the bridge's outbox folder"`
@@ -97,6 +103,10 @@ func NewMCPServer(client *BridgeClient, dataDir string) *mcp.Server {
 	addSend(server, "send_audio_message", "Send an audio file from the bridge's outbox as a voice message (Ogg Opus, or MP3/M4A/WAV when ffmpeg is installed). Requires the user's approval in Pi.",
 		func(in SendMediaInput) (SendInput, *ApprovalProof) {
 			return SendInput{Kind: "voice", Recipient: in.Recipient, MediaID: in.MediaID}, in.Approval
+		}, client)
+	addSend(server, "send_poll", "Send a WhatsApp poll with tappable options (single choice). Requires the user's approval in Pi.",
+		func(in SendPollInput) (SendInput, *ApprovalProof) {
+			return SendInput{Kind: "poll", Recipient: in.Recipient, Message: in.Question, Options: in.Options}, in.Approval
 		}, client)
 	return server
 }

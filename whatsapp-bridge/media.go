@@ -75,11 +75,11 @@ func RejectObviousSecrets(filename string, data []byte) error {
 // be sent. Attachments come only from regular files placed directly in the outbox.
 // Nothing reaches WhatsApp here: uploads happen only after approval.
 func FreezeSend(ctx context.Context, dataDir string, in SendInput) (FrozenDraft, error) {
-	draft := FrozenDraft{Input: in, Payload: ApprovalPayload{RecipientJID: recipientJID(in.Recipient), Message: in.Message, Kind: in.Kind}}
+	draft := FrozenDraft{Input: in, Payload: ApprovalPayload{RecipientJID: recipientJID(in.Recipient), Message: in.Message, Kind: in.Kind, Options: append([]string(nil), in.Options...)}}
 	if err := RejectObviousSecrets("", []byte(in.Message)); err != nil {
 		return FrozenDraft{}, err
 	}
-	if in.Kind == "text" {
+	if in.Kind == "text" || in.Kind == "poll" {
 		return draft, nil
 	}
 	if in.Kind == "voice" && in.Message != "" {

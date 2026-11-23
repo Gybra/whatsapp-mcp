@@ -23,7 +23,7 @@ If you try it on Windows, Linux ARM64 or an Intel Mac, please [open an issue](ht
 ## What it does
 
 - **Read:** search contacts, list chats and messages with filters, get the messages around a message, and download received files, including voice messages, to a private folder.
-- **Send:** text messages, files and voice messages, each only after a human approves that exact message.
+- **Send:** text messages, files, voice messages and polls, each only after a human approves that exact message.
 - **Run in the background:** optionally start at login, reconnect after network outages, and stop cleanly.
 
 No agent can send on its own: the bridge refuses any message without a valid approval, whichever program asks.

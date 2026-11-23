@@ -416,3 +416,65 @@ func TestProtocolVector(t *testing.T) {
 		t.Fatalf("fixture proof did not authorize the frozen draft: %v", err)
 	}
 }
+
+func pollDraft(question string, options []string) FrozenDraft {
+	return FrozenDraft{
+		Input:   SendInput{Kind: "poll", Recipient: "12025550123", Message: question, Options: options},
+		Payload: ApprovalPayload{RecipientJID: "12025550123@s.whatsapp.net", Message: question, Kind: "poll", Options: options},
+	}
+}
+
+func TestValidatePoll(t *testing.T) {
+	valid := []struct {
+		name    string
+		options []string
+	}{
+		{"minimum", []string{"Yes", "No"}},
+		{"maximum", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}},
+		{"100 byte option", []string{"Yes", strings.Repeat("x", 100)}},
+	}
+	for _, tc := range valid {
+		t.Run("valid/"+tc.name, func(t *testing.T) {
+			if err := validatePoll("Question?", tc.options); err != nil {
+				t.Fatalf("expected valid, got %v", err)
+			}
+			if err := validateDraft(pollDraft("Question?", tc.options)); err != nil {
+				t.Fatalf("draft should validate, got %v", err)
+			}
+		})
+	}
+	invalid := []struct {
+		name     string
+		question string
+		options  []string
+	}{
+		{"no options", "Question?", nil},
+		{"one option", "Question?", []string{"Yes"}},
+		{"thirteen options", "Question?", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m"}},
+		{"empty option", "Question?", []string{"Yes", ""}},
+		{"101 byte option", "Question?", []string{"Yes", strings.Repeat("x", 101)}},
+		{"duplicate case and space", "Question?", []string{"Yes", " yes "}},
+		{"invalid utf8 option", "Question?", []string{"Yes", string([]byte{0xff})}},
+		{"question too long", strings.Repeat("q", pollQuestionBytes+1), []string{"Yes", "No"}},
+	}
+	for _, tc := range invalid {
+		t.Run("invalid/"+tc.name, func(t *testing.T) {
+			if err := validatePoll(tc.question, tc.options); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+
+	// A poll carries no attachment and no media bytes.
+	withAttachment := pollDraft("Question?", []string{"Yes", "No"})
+	withAttachment.Payload.Attachment = &AttachmentView{ID: "x", Name: "x", MIME: "text/plain", Size: 1, SHA256: strings.Repeat("0", 64)}
+	if err := validateDraft(withAttachment); err == nil {
+		t.Fatal("a poll with an attachment must be rejected")
+	}
+	// The reviewed options must be the submitted ones.
+	mismatched := pollDraft("Question?", []string{"Yes", "No"})
+	mismatched.Payload.Options = []string{"Yes", "Maybe"}
+	if err := validateDraft(mismatched); err == nil {
+		t.Fatal("a poll whose options changed after freezing must be rejected")
+	}
+}

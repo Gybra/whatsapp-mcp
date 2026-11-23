@@ -373,6 +373,17 @@ func (r *WhatsAppRuntime) buildMessage(ctx context.Context, draft FrozenDraft) (
 	if p.Kind == "text" {
 		return &waE2E.Message{Conversation: proto.String(p.Message)}, record, nil
 	}
+	if p.Kind == "poll" {
+		options := make([]*waE2E.PollCreationMessage_Option, 0, len(p.Options))
+		for _, option := range p.Options {
+			options = append(options, &waE2E.PollCreationMessage_Option{OptionName: proto.String(option)})
+		}
+		return &waE2E.Message{PollCreationMessage: &waE2E.PollCreationMessage{
+			Name:                   proto.String(p.Message),
+			Options:                options,
+			SelectableOptionsCount: proto.Uint32(1),
+		}}, record, nil
+	}
 	a := p.Attachment
 	mediaType, kind := mediaTypeFor(a.MIME)
 	up, err := r.transport.Upload(ctx, draft.Media, mediaType)

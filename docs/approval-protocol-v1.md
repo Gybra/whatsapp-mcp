@@ -1,6 +1,6 @@
 # Approval protocol v1
 
-Every outgoing WhatsApp operation (text, file or voice message) is sent only after a human approves that exact operation. The bridge enforces this: it refuses to send without a valid proof, whichever client calls it. This document describes the wire format shared by the bridge and an approver such as the [`pi-whatsapp`](https://github.com/Gybra/pi-whatsapp) Pi extension.
+Every outgoing WhatsApp operation (text, file, voice message or poll) is sent only after a human approves that exact operation. The bridge enforces this: it refuses to send without a valid proof, whichever client calls it. This document describes the wire format shared by the bridge and an approver such as the [`pi-whatsapp`](https://github.com/Gybra/pi-whatsapp) Pi extension.
 
 ## Roles
 
@@ -23,10 +23,11 @@ All JSON field names are as listed. Binary values are standard base64 with paddi
 
 | Field | Type | Notes |
 |---|---|---|
-| `kind` | string | `text`, `file` or `voice` |
+| `kind` | string | `text`, `file`, `voice` or `poll` |
 | `recipient` | string | as submitted by the client |
-| `message` | string | text, or caption for media; UTF-8, at most 32 KiB |
-| `media_id` | string | empty for `text` |
+| `message` | string | text, or caption for media, or the question for a poll; UTF-8, at most 32 KiB |
+| `media_id` | string | empty for `text` and `poll` |
+| `options` | array of strings or `null` | a poll's answers: 2 to 12 distinct entries, each at most 100 bytes; `null` for every other kind |
 
 `ApprovalPayload`, the reviewed content, serialized in exactly this field order:
 
@@ -37,7 +38,8 @@ All JSON field names are as listed. Binary values are standard base64 with paddi
 | `recipient_jid` | string | resolved WhatsApp recipient |
 | `message` | string | identical to `SendInput.message` |
 | `kind` | string | identical to `SendInput.kind` |
-| `attachment` | object or `null` | `id`, `name`, `mime`, `size` (bytes) and `sha256` (lowercase hex) of the frozen file, at most 16 MiB |
+| `options` | array of strings or `null` | identical to `SendInput.options`; for a poll, the question in `message` is at most 255 bytes and the poll is single choice |
+| `attachment` | object or `null` | `id`, `name`, `mime`, `size` (bytes) and `sha256` (lowercase hex) of the frozen file, at most 16 MiB; `null` for `text` and `poll` |
 | `expires_at` | number | Unix seconds |
 
 `DraftView`: `draft_id`, `payload_b64` (the exact payload bytes), `challenge_b64`, `approver_id`, `expires_at`.

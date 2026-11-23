@@ -278,6 +278,13 @@ func validateSendInput(in SendInput) error {
 		if in.Message == "" || in.MediaID != "" {
 			return ErrInvalidRequest
 		}
+	case "poll":
+		if in.Message == "" || in.MediaID != "" {
+			return ErrInvalidRequest
+		}
+		if err := validatePoll(in.Message, in.Options); err != nil {
+			return err
+		}
 	case "file", "voice":
 		if in.MediaID == "" || len(in.MediaID) > 128 || strings.ContainsAny(in.MediaID, `/\`) || in.MediaID == "." || in.MediaID == ".." {
 			return ErrInvalidRequest

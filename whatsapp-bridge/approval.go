@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -19,11 +21,15 @@ import (
 // operation that an explicitly enrolled approver signed after reviewing its
 // exact frozen content. Grants live in memory, expire and are single use.
 const (
-	approvalDomain   = "whatsapp-mcp/approval/v1"
-	approvalLifetime = 120 * time.Second
-	maxPendingDrafts = 32
-	maxMessageBytes  = 32 * 1024
-	maxMediaBytes    = 16 * 1024 * 1024
+	approvalDomain    = "whatsapp-mcp/approval/v1"
+	approvalLifetime  = 120 * time.Second
+	maxPendingDrafts  = 32
+	maxMessageBytes   = 32 * 1024
+	maxMediaBytes     = 16 * 1024 * 1024
+	pollMinOptions    = 2
+	pollMaxOptions    = 12
+	pollOptionBytes   = 100
+	pollQuestionBytes = 255
 )
 
 // Error values double as the API error codes returned to clients.
@@ -39,10 +45,11 @@ var (
 
 // SendInput is the outgoing operation exactly as a client submitted it.
 type SendInput struct {
-	Kind      string `json:"kind"`
-	Recipient string `json:"recipient"`
-	Message   string `json:"message"`
-	MediaID   string `json:"media_id"`
+	Kind      string   `json:"kind"`
+	Recipient string   `json:"recipient"`
+	Message   string   `json:"message"`
+	MediaID   string   `json:"media_id"`
+	Options   []string `json:"options"`
 }
 
 type AttachmentView struct {
@@ -60,6 +67,7 @@ type ApprovalPayload struct {
 	RecipientJID string          `json:"recipient_jid"`
 	Message      string          `json:"message"`
 	Kind         string          `json:"kind"`
+	Options      []string        `json:"options"`
 	Attachment   *AttachmentView `json:"attachment"`
 	ExpiresAt    int64           `json:"expires_at"`
 }
@@ -206,10 +214,17 @@ func (m *ApprovalManager) Consume(input SendInput, proof ApprovalProof) (FrozenD
 
 	draft := g.draft
 	g.used, g.draft = true, FrozenDraft{} // keep a tombstone, not the bytes
-	if input != draft.Input {
+	if !sameSendInput(input, draft.Input) {
 		return FrozenDraft{}, ErrApprovalInvalid
 	}
 	return draft, nil
+}
+
+// sameSendInput reports whether a submitted send is byte-for-byte the one that was frozen.
+// SendInput holds a slice, so it cannot be compared with ==.
+func sameSendInput(a, b SendInput) bool {
+	return a.Kind == b.Kind && a.Recipient == b.Recipient && a.Message == b.Message &&
+		a.MediaID == b.MediaID && slices.Equal(a.Options, b.Options)
 }
 
 // TrustedApprover reports the enrolled approver's fingerprint, never key material.
@@ -296,6 +311,17 @@ func validateDraft(d FrozenDraft) error {
 		if in.Message == "" || in.MediaID != "" || p.Attachment != nil || len(d.Media) != 0 {
 			return ErrInvalidRequest
 		}
+	case "poll":
+		// Message carries the poll question; options are the answers.
+		if in.Message == "" || in.MediaID != "" || p.Attachment != nil || len(d.Media) != 0 {
+			return ErrInvalidRequest
+		}
+		if !slices.Equal(in.Options, p.Options) {
+			return ErrInvalidRequest
+		}
+		if err := validatePoll(in.Message, in.Options); err != nil {
+			return err
+		}
 	case "file", "voice":
 		a := p.Attachment
 		if a == nil || in.MediaID == "" || a.ID != in.MediaID || a.Size != int64(len(d.Media)) ||
@@ -310,11 +336,37 @@ func validateDraft(d FrozenDraft) error {
 
 func cloneDraft(d FrozenDraft) FrozenDraft {
 	d.Media = append([]byte(nil), d.Media...)
+	d.Input.Options = append([]string(nil), d.Input.Options...)
+	d.Payload.Options = append([]string(nil), d.Payload.Options...)
 	if d.Payload.Attachment != nil {
 		attachment := *d.Payload.Attachment
 		d.Payload.Attachment = &attachment
 	}
 	return d
+}
+
+// validatePoll applies WhatsApp's own limits for a poll: a short question and
+// 2-12 distinct, short options. Distinctness is case- and space-insensitive so
+// a poll cannot show the same answer twice.
+func validatePoll(question string, options []string) error {
+	if len(question) > pollQuestionBytes || !utf8.ValidString(question) {
+		return ErrInvalidRequest
+	}
+	if len(options) < pollMinOptions || len(options) > pollMaxOptions {
+		return ErrInvalidRequest
+	}
+	seen := make(map[string]struct{}, len(options))
+	for _, option := range options {
+		if option == "" || len(option) > pollOptionBytes || !utf8.ValidString(option) {
+			return ErrInvalidRequest
+		}
+		key := strings.ToLower(strings.TrimSpace(option))
+		if _, dup := seen[key]; dup {
+			return ErrInvalidRequest
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
 }
 
 func approvalChallenge(nonce, payload []byte, publicKey ed25519.PublicKey) []byte {

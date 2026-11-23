@@ -101,7 +101,7 @@ func (m *mcpTest) call(t *testing.T, name string, args map[string]any) (*mcp.Cal
 }
 
 var allTools = []string{"download_media", "get_chat", "get_contact_chats", "get_direct_chat_by_contact", "get_last_interaction", "get_message_context",
-	"list_chats", "list_messages", "search_contacts", "send_audio_message", "send_file", "send_message"}
+	"list_chats", "list_messages", "search_contacts", "send_audio_message", "send_file", "send_message", "send_poll"}
 
 func TestMCPToolsDiscovery(t *testing.T) {
 	m := newMCPTest(t)
